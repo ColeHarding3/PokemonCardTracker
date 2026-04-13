@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pokemon Card Portfolio Tracker</title>
+  <meta name="description" content="Track your Pokemon card collection value in real time." />
+  <link rel="stylesheet" href="css/style.css" />
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+<!-- ============================================================ SETUP SCREEN -->
+<div id="setup-screen" style="display:none">
+  <div class="setup-box">
+    <span class="pokeball">⚪</span>
+    <h1>Pokemon Card Tracker</h1>
+    <p>
+      To get started, paste your <strong>Google Apps Script Web App URL</strong> below.<br />
+      Check <a href="SETUP.md" target="_blank">SETUP.md</a> if you haven't deployed it yet.
+    </p>
+    <div class="input-group">
+      <input
+        id="setup-url-input"
+        type="url"
+        placeholder="https://script.google.com/macros/s/…/exec"
+        autocomplete="off"
+      />
+      <button class="btn btn-primary" onclick="saveScriptUrl()">Connect</button>
+    </div>
+    <p class="setup-link">
+      Need help? See the <a href="SETUP.md" target="_blank">setup guide</a>.
+    </p>
+  </div>
+</div>
+
+<!-- ============================================================ MAIN APP -->
+<div id="main-app">
+
+  <!-- Header -->
+  <header class="app-header">
+    <div class="header-brand">
+      <span class="brand-icon">⚡</span>
+      <span class="brand-name">Pokemon <span>Portfolio</span></span>
+    </div>
+    <div class="header-actions">
+      <span class="last-updated-tag" id="last-updated">Loading…</span>
+      <button class="btn btn-primary" onclick="openAddModal()">+ Add Card</button>
+    </div>
+  </header>
+
+  <!-- Ticker bar (populated by JS if data available) -->
+  <div class="ticker-bar" id="ticker-bar" style="display:none">
+    <div class="ticker-inner" id="ticker-inner"></div>
+  </div>
+
+  <!-- Main content -->
+  <main class="main-content">
+
+    <!-- Hero Stats -->
+    <div class="hero-stats">
+      <div class="stat-card">
+        <span class="stat-icon">💰</span>
+        <div class="stat-label">Portfolio Value</div>
+        <div class="stat-value" id="stat-total-value">—</div>
+      </div>
+      <div class="stat-card">
+        <span class="stat-icon">📈</span>
+        <div class="stat-label">All-Time Gain</div>
+        <div class="stat-value" id="stat-gain">—</div>
+        <span class="stat-badge" id="stat-gain-pct">—</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-icon">📊</span>
+        <div class="stat-label">Daily Change</div>
+        <div class="stat-value" id="stat-daily">—</div>
+        <span class="stat-badge" id="stat-daily-pct">—</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-icon">🃏</span>
+        <div class="stat-label">Total Cards</div>
+        <div class="stat-value" id="stat-total-cards">—</div>
+      </div>
+    </div>
+
+    <!-- Chart + Side Stats -->
+    <div class="grid-2">
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Portfolio Value Over Time</span>
+          <div class="range-btns">
+            <button class="range-btn" data-range="1W">1W</button>
+            <button class="range-btn" data-range="1M">1M</button>
+            <button class="range-btn" data-range="3M">3M</button>
+            <button class="range-btn" data-range="6M">6M</button>
+            <button class="range-btn" data-range="1Y">1Y</button>
+            <button class="range-btn active" data-range="ALL">ALL</button>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div class="chart-wrapper">
+            <canvas id="portfolio-chart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Collection Stats</span>
+        </div>
+        <div class="panel-body" style="padding: 0 20px;">
+          <div class="top-stats-list">
+            <div class="top-stat-row">
+              <span class="top-stat-label">Most Valuable</span>
+              <div>
+                <div class="top-stat-val" id="top-card-name">—</div>
+                <div class="top-stat-sub" id="top-card-value"></div>
+              </div>
+            </div>
+            <div class="top-stat-row">
+              <span class="top-stat-label">Avg Card Value</span>
+              <div class="top-stat-val" id="avg-card-value">—</div>
+            </div>
+            <div class="top-stat-row">
+              <span class="top-stat-label">Total Invested</span>
+              <div class="top-stat-val" id="total-invested">—</div>
+            </div>
+            <div class="top-stat-row">
+              <span class="top-stat-label">Current Value</span>
+              <div class="top-stat-val" id="total-current">—</div>
+            </div>
+            <div class="top-stat-row">
+              <span class="top-stat-label">Best Performer</span>
+              <div>
+                <div class="top-stat-val" id="best-performer">—</div>
+                <div class="top-stat-sub"><span id="best-performer-pct"></span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Inventory Table -->
+    <div class="table-section">
+      <div class="table-toolbar">
+        <div class="table-toolbar-left">
+          <span class="panel-title">Card Inventory</span>
+          <div class="search-wrap">
+            <span class="search-icon">🔍</span>
+            <input
+              id="search-input"
+              type="text"
+              placeholder="Search cards, sets…"
+            />
+          </div>
+          <span class="table-count" id="table-count"></span>
+        </div>
+        <button class="btn btn-primary" onclick="openAddModal()">+ Add Card</button>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th data-sort="Card Name">Card Name</th>
+              <th data-sort="Set">Set</th>
+              <th data-sort="Condition">Condition</th>
+              <th data-sort="Quantity">Qty</th>
+              <th data-sort="Current Price">Price</th>
+              <th data-sort="Purchase Price">Change</th>
+              <th data-sort="Total Value">Total Value</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="inventory-tbody">
+            <tr>
+              <td colspan="8" class="empty-state">Loading inventory…</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="app-footer">
+    <span>Pokemon Card Portfolio Tracker</span>
+    <div class="footer-actions">
+      <button id="update-url-btn">Update Apps Script URL</button>
+    </div>
+  </footer>
+
+</div>
+
+<!-- ============================================================ ADD/EDIT MODAL -->
+<div id="card-modal" class="modal-overlay">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h2 id="modal-title">Add Card</h2>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <form id="card-form" autocomplete="off">
+        <div class="form-grid">
+
+          <div class="form-group span-2">
+            <label for="field-name">Card Name *</label>
+            <input id="field-name" type="text" placeholder="e.g. Charizard" required />
+          </div>
+
+          <div class="form-group">
+            <label for="field-set">Set</label>
+            <input id="field-set" type="text" placeholder="e.g. Base Set" />
+          </div>
+
+          <div class="form-group">
+            <label for="field-number">Card Number</label>
+            <input id="field-number" type="text" placeholder="e.g. 4/102" />
+          </div>
+
+          <div class="form-group">
+            <label for="field-condition">Condition</label>
+            <select id="field-condition">
+              <option value="Mint">Mint</option>
+              <option value="NM" selected>Near Mint (NM)</option>
+              <option value="LP">Lightly Played (LP)</option>
+              <option value="MP">Moderately Played (MP)</option>
+              <option value="HP">Heavily Played (HP)</option>
+              <option value="Damaged">Damaged</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="field-qty">Quantity</label>
+            <input id="field-qty" type="number" min="1" value="1" />
+          </div>
+
+          <div class="form-group">
+            <label>Graded Card?</label>
+            <div class="checkbox-group">
+              <input id="field-graded" type="checkbox" />
+              <label for="field-graded">This card is professionally graded</label>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="field-psa">PSA Grade</label>
+            <input id="field-psa" type="number" min="1" max="10" placeholder="1–10" />
+          </div>
+
+          <div class="form-group">
+            <label for="field-purchase-price">Purchase Price ($)</label>
+            <input id="field-purchase-price" type="number" min="0" step="0.01" placeholder="0.00" />
+          </div>
+
+          <div class="form-group">
+            <label for="field-current-price">Current Price ($)</label>
+            <input id="field-current-price" type="number" min="0" step="0.01" placeholder="0.00" />
+          </div>
+
+          <div class="form-group span-2">
+            <label for="field-url">PriceCharting URL</label>
+            <input id="field-url" type="url" placeholder="https://www.pricecharting.com/game/…" />
+          </div>
+
+          <div class="form-group span-2">
+            <label for="field-notes">Notes</label>
+            <textarea id="field-notes" placeholder="Any extra details…"></textarea>
+          </div>
+
+          <!-- Hidden: date added (populated on edit) -->
+          <input id="field-date-added" type="hidden" />
+
+        </div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" type="button" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" id="form-submit-btn" type="submit" form="card-form">Save Card</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ CONFIRM DIALOG -->
+<div id="confirm-dialog" class="modal-overlay">
+  <div class="confirm-box">
+    <div class="warn-icon">⚠️</div>
+    <h3>Delete Card?</h3>
+    <p id="confirm-msg">Are you sure you want to delete this card?</p>
+    <div class="confirm-actions">
+      <button id="confirm-no" class="btn btn-ghost">Cancel</button>
+      <button id="confirm-yes" class="btn btn-danger">Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ GLOBAL LOADER -->
+<div id="global-loader">
+  <div class="loader-spinner"></div>
+</div>
+
+<!-- ============================================================ TOAST -->
+<div id="toast-container"></div>
+
+<!-- Scripts -->
+<script src="js/config.js"></script>
+<script src="js/app.js"></script>
+
+</body>
+</html>
