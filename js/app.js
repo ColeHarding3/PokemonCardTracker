@@ -439,12 +439,15 @@ function renderChart() {
     if (state.chartInstance) { state.chartInstance.destroy(); state.chartInstance = null; }
   }
 
+  console.log("[chart] allPriceHistory:", state.allPriceHistory);
+
   if (!state.allPriceHistory || !state.allPriceHistory.length) {
     showNoData("Run the price scraper to see portfolio history.");
     return;
   }
 
   let calc = calculateHistoricalPortfolio(state.allPriceHistory, state.inventory);
+  console.log("[chart] calc results:", calc);
 
   // Apply range filter (month-based cutoff)
   if (state.chartRange !== "ALL") {
@@ -529,6 +532,7 @@ function renderChart() {
 // ============================================================
 
 function calculateHistoricalPortfolio(allHistory, inventory) {
+  console.log("[calc] allHistory length:", allHistory.length, "inventory length:", inventory.length);
   if (!allHistory.length || !inventory.length) return [];
 
   // Build map: "cardName|||set|||condType" -> { "YYYY-MM": price }
@@ -538,6 +542,7 @@ function calculateHistoricalPortfolio(allHistory, inventory) {
     if (!priceMap[key]) priceMap[key] = {};
     priceMap[key][row.date] = row.price;
   }
+  console.log("[calc] priceMap keys:", Object.keys(priceMap));
 
   // Determine condition type per card
   function condTypeForCard(card) {
@@ -570,6 +575,7 @@ function calculateHistoricalPortfolio(allHistory, inventory) {
       const qty = parseFloat(card["Quantity"]) || 1;
       const price = priceAtMonth(priceMap[key], month)
         ?? parseFloat(card["Current Price"]) ?? 0;
+      console.log("[calc]", month, "|", card["Card Name"], "| condType:", condType, "| inPriceMap:", !!priceMap[key], "| price:", price, "| qty:", qty);
       totalValue += price * qty;
     }
     results.push({ date: month, value: totalValue });
