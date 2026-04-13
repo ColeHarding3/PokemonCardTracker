@@ -3,6 +3,21 @@
 
 var SHEET_ID = SpreadsheetApp.getActiveSpreadsheet().getId();
 
+/**
+ * Return a 1-indexed column map from the Inventory header row.
+ * e.g. { "Card Name": 2, "Image URL": 16, ... }
+ */
+function getInventoryColumnMap_() {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Inventory");
+  if (!sheet) return {};
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  var map = {};
+  for (var i = 0; i < headers.length; i++) {
+    if (headers[i]) map[headers[i].toString().trim()] = i + 1; // 1-indexed
+  }
+  return map;
+}
+
 // ============================================================
 // SHEET SETUP
 // ============================================================
@@ -381,18 +396,22 @@ function updatePrices(priceUpdates) {
   var now = new Date();
   var timestamp = Utilities.formatDate(now, Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss");
 
+  var colMap = getInventoryColumnMap_();
+  var colQty   = colMap["Quantity"]      || 6;
+  var colPrice = colMap["Current Price"] || 11;
+  var colTotal = colMap["Total Value"]   || 12;
+
   priceUpdates.forEach(function(update) {
     var ri = parseInt(update.rowIndex);
     if (!ri || ri < 2) return;
 
-    var rowData = sheet.getRange(ri, 1, 1, 14).getValues()[0];
-    var qty = parseFloat(rowData[5]) || 1;
+    var rowData = sheet.getRange(ri, 1, 1, sheet.getLastColumn()).getValues()[0];
+    var qty = parseFloat(rowData[colQty - 1]) || 1;
     var newPrice = parseFloat(update.currentPrice) || 0;
     var totalValue = newPrice * qty;
 
-    // Update Current Price and Total Value columns (cols 11 and 12)
-    sheet.getRange(ri, 11).setValue(newPrice);
-    sheet.getRange(ri, 12).setValue(totalValue);
+    sheet.getRange(ri, colPrice).setValue(newPrice);
+    sheet.getRange(ri, colTotal).setValue(totalValue);
 
     // Log to Price History
     if (histSheet) {
@@ -645,6 +664,8 @@ function updatePriceChartingUrls(updates) {
   if (!updates || !updates.length) return { status: "success", message: "No updates" };
 
   var data = sheet.getDataRange().getValues();
+  var colMap = getInventoryColumnMap_();
+  var colPcUrl = colMap["PriceCharting URL"] || 13;
   var count = 0;
   for (var i = 0; i < updates.length; i++) {
     var url = updates[i].url || "";
@@ -654,7 +675,7 @@ function updatePriceChartingUrls(updates) {
       rowIndex = findRowByNameSet_(data, updates[i].cardName, updates[i].set);
     }
     if (!rowIndex) continue;
-    sheet.getRange(rowIndex, 13).setValue(url); // col 13 = PriceCharting URL
+    sheet.getRange(rowIndex, colPcUrl).setValue(url);
     count++;
   }
   return { status: "success", message: "Updated " + count + " PriceCharting URL(s)" };
@@ -672,6 +693,8 @@ function updateImageUrls(updates) {
   if (!updates || !updates.length) return { status: "success", message: "No updates" };
 
   var data = sheet.getDataRange().getValues();
+  var colMap = getInventoryColumnMap_();
+  var colImg = colMap["Image URL"] || 16;
   var count = 0;
   for (var i = 0; i < updates.length; i++) {
     var imageUrl = updates[i].imageUrl || "";
@@ -680,7 +703,7 @@ function updateImageUrls(updates) {
       rowIndex = findRowByNameSet_(data, updates[i].cardName, updates[i].set);
     }
     if (!rowIndex) continue;
-    sheet.getRange(rowIndex, 16).setValue(imageUrl); // col 16 = Image URL
+    sheet.getRange(rowIndex, colImg).setValue(imageUrl);
     count++;
   }
   return { status: "success", message: "Updated " + count + " image URL(s)" };
