@@ -286,370 +286,259 @@ def parse_psa_pop(pop_data):
 
 def extract_current_price(soup):
     """Scrape the visible current price from the page as a fallback."""
-    for sel in ["#used_price .price", ".price-box .price", "#complete_price .price"]:
-        el = soup.select_one(sel)
-        if el:
+    for sel in ["#used_price .price", "#price", ".price"]:
+        tag = soup.select_one(sel)
+        if tag:
+            txt = tag.get_text(strip=True).replace("$", "").replace(",", "")
             try:
-                return float(el.get_text(strip=True).replace("$", "").replace(",", ""))
+                return float(txt)
             except ValueError:
                 continue
     return None
 
 # ============================================================
-# MAIN SCRAPE FUNCTION PER CARD
+# PRICECHARTING URL FINDER
 # ============================================================
 
-def scrape_card(url, session):
-    """
-    Scrape a PriceCharting product page for a single card.
-    Returns dict with priceHistory, psaPopulation, currentPrice, productId.
-    """
-    resp = session.get(url, headers=HEADERS, timeout=REQUEST_TIMEOUT)
-    resp.raise_for_status()
-    page_text = resp.text
-    soup = BeautifulSoup(page_text, "html.parser")
-
-    product_id = get_product_id(soup, page_text)
-    log.info("  product_id: %s", product_id or "not found")
-
-    # Price history from VGPC.chart_data
-    chart_data = extract_js_object(page_text, "VGPC.chart_data")
-    if chart_data:
-        log.info("  chart_data keys: %s", list(chart_data.keys()))
-        price_history = parse_chart_data(chart_data)
-        pts = {k: len(v) for k, v in price_history.items()}
-        log.info("  history points: ungraded=%d psa9=%d psa10=%d",
-                 pts["ungraded"], pts["psa9"], pts["psa10"])
-    else:
-        log.warning("  VGPC.chart_data not found")
-        price_history = {"ungraded": [], "psa9": [], "psa10": []}
-
-    # Volume from completed-sales tables
-    volumes = extract_volume(soup)
-    price_history = apply_volume(price_history, volumes)
-
-    # PSA population from VGPC.pop_data
-    pop_data = extract_js_object(page_text, "VGPC.pop_data")
-    psa_pop = parse_psa_pop(pop_data)
-    log.info("  PSA pop — 9: %s  10: %s", psa_pop["psa9"], psa_pop["psa10"])
-
-    # Current price fallback
-    current_price = extract_current_price(soup)
-    if current_price is None:
-        # Use last ungraded history point
-        ug = price_history.get("ungraded", [])
-        if ug:
-            current_price = ug[-1]["price"]
-
-    return {
-        "priceHistory": price_history,
-        "psaPopulation": psa_pop,
-        "currentPrice": current_price,
-        "productId": product_id,
-    }
-
-def derive_image_filename(image_url):
-    """
-    Convert a Pokemon TCG API image URL to a local filename.
-    e.g. https://images.pokemontcg.io/swsh7/215_hires.png -> swsh7-215_hires.png
-    Falls back to a sanitized basename if the pattern doesn't match.
-    """
-    m = re.search(r"images\.pokemontcg\.io/([^/]+)/([^/?#]+)", image_url or "")
-    if m:
-        return f"{m.group(1)}-{m.group(2)}"
-    # Fallback: strip query params and use the last path component
-    basename = image_url.rstrip("/").split("/")[-1].split("?")[0]
-    return re.sub(r"[^\w.\-]", "_", basename) or "card.png"
-
-
-def download_images(inventory, session):
-    """
-    Download card images from TCG API URLs to images/cards/ in the repo root.
-    Returns list of {rowIndex, imageUrl} dicts with GitHub Pages URLs for cards
-    whose image was newly saved (or already existed on disk).
-    Only processes cards that have an image URL pointing to pokemontcg.io.
-    """
-    IMAGES_DIR.mkdir(parents=True, exist_ok=True)
-    log.info("  Image directory: %s", IMAGES_DIR)
-
-    updates = []
-    newly_saved = []
-
-    for card in inventory:
-        image_url = str(card.get("Image URL") or "").strip()
-        if not image_url or "pokemontcg.io" not in image_url:
-            continue
-
-        filename = derive_image_filename(image_url)
-        local_path = IMAGES_DIR / filename
-        gh_url = f"{GITHUB_PAGES_BASE}/images/cards/{filename}"
-
-        # Skip download if already on disk
-        if local_path.exists():
-            log.info("  image already cached: %s", filename)
-            updates.append({"rowIndex": card["_rowIndex"], "imageUrl": gh_url})
-            continue
-
-        try:
-            time.sleep(REQUEST_DELAY * 0.4)  # lighter delay for image CDN
-            resp = session.get(image_url, timeout=REQUEST_TIMEOUT)
-            resp.raise_for_status()
-            local_path.write_bytes(resp.content)
-            log.info("  image saved: %s (%d bytes)", filename, len(resp.content))
-            updates.append({"rowIndex": card["_rowIndex"], "imageUrl": gh_url})
-            newly_saved.append(local_path)
-        except Exception as e:
-            log.warning("  image download failed (%s): %s", filename, e)
-
-    if newly_saved:
-        log.info(
-            "  %d new image(s) saved to %s — "
-            "commit and push images/cards/ to make them live on GitHub Pages.",
-            len(newly_saved), IMAGES_DIR,
-        )
-    return updates
-
-
-def _slugify(text):
-    """'Pokemon Evolving Skies' -> 'pokemon-evolving-skies'"""
-    slug = text.lower()
-    slug = re.sub(r"[^a-z0-9]+", "-", slug)
-    return slug.strip("-")
-
-
-def search_for_url(card_name, set_name, session, card_number=""):
-    """
-    Search PriceCharting for a card using their JSON search API and return
-    the product page URL.  The HTML search page no longer contains results
-    in the server-rendered markup — results are JS-rendered — so we use:
-      /search-products?q=...&type=pokemon&format=json
-    which returns a JSON list of products without requiring an API token.
-    """
-    query = f"{card_name} {set_name}".strip()
-    api_url = (
-        f"{PRICECHARTING_BASE}/search-products"
-        f"?q={quote_plus(query)}&type=pokemon&format=json"
-    )
+def find_pricecharting_url(session, card_name, card_set=""):
+    """Search pricecharting.com for a card and return the product URL."""
+    query = f"{card_name} {card_set}".strip()
+    search_url = f"{PRICECHARTING_BASE}/search-products?q={quote_plus(query)}&type=pokemon&format=json"
+    log.info("Searching PriceCharting: %s", search_url)
     try:
-        resp = session.get(api_url, headers=HEADERS, timeout=REQUEST_TIMEOUT)
+        resp = session.get(search_url, headers=HEADERS, timeout=REQUEST_TIMEOUT)
         resp.raise_for_status()
-        products = resp.json().get("products", [])
-        if not products:
-            log.warning("  Search returned no products.")
-            return None
-
-        # If we have a card number, prefer the result whose productName contains it
-        chosen = products[0]
-        if card_number:
-            card_number_str = str(card_number).lstrip("0")
-            for p in products:
-                pname = p.get("productName", "")
-                # Match "#215" or "215" at the end of the product name
-                if re.search(r"#0*" + re.escape(card_number_str) + r"(\b|$)", pname):
-                    chosen = p
-                    break
-
-        console_slug = _slugify(chosen.get("consoleName", ""))
-        product_slug = _slugify(chosen.get("productName", ""))
-        if not console_slug or not product_slug:
-            log.warning("  Could not build slug from product data: %s", chosen)
-            return None
-
-        found = f"{PRICECHARTING_BASE}/game/{console_slug}/{product_slug}"
-        log.info("  Found via search: %s  (%s)", found, chosen.get("productName"))
-        return found
-
+        data = resp.json()
+        products = data if isinstance(data, list) else data.get("products", [])
+        if products:
+            # Pick the first (best) match
+            p = products[0]
+            product_url = p.get("url", "")
+            if product_url and not product_url.startswith("http"):
+                product_url = urljoin(PRICECHARTING_BASE, product_url)
+            log.info("Found URL: %s", product_url)
+            return product_url
     except Exception as e:
-        log.error("  Search error: %s", e)
+        log.warning("PriceCharting search failed: %s", e)
     return None
 
 # ============================================================
-# MAIN
+# IMAGE DOWNLOAD
 # ============================================================
 
-def scrape_all():
-    log.info("=" * 64)
-    log.info("Pokemon Card Portfolio Scraper — Full History Mode")
-    log.info("=" * 64)
+def download_image(session, image_url, card_name, card_set=""):
+    """Download card image and save locally; return the GitHub Pages URL."""
+    if not image_url:
+        return ""
+    safe_name = re.sub(r'[^\w\-]', '_', f"{card_name}_{card_set}".strip('_').lower())
+    ext = ".png"
+    if ".jpg" in image_url.lower() or ".jpeg" in image_url.lower():
+        ext = ".jpg"
+    local_path = IMAGES_DIR / f"{safe_name}{ext}"
+    if local_path.exists():
+        return f"{GITHUB_PAGES_BASE}/images/cards/{safe_name}{ext}"
+    try:
+        IMAGES_DIR.mkdir(parents=True, exist_ok=True)
+        resp = session.get(image_url, headers=HEADERS, timeout=REQUEST_TIMEOUT)
+        resp.raise_for_status()
+        local_path.write_bytes(resp.content)
+        log.info("Downloaded image → %s", local_path.name)
+        return f"{GITHUB_PAGES_BASE}/images/cards/{safe_name}{ext}"
+    except Exception as e:
+        log.warning("Image download failed: %s", e)
+        return ""
+
+# ============================================================
+# MAIN SCRAPING PIPELINE
+# ============================================================
+
+log = logging.getLogger("scraper")
+
+def scrape_card(session, card):
+    """Scrape one card's full price history from pricecharting.com."""
+    name       = str(card.get("Card Name", "")).strip()
+    card_set   = str(card.get("Set", "")).strip()
+    card_num   = str(card.get("Card Number", "")).strip()
+    pc_url     = str(card.get("PriceCharting URL", "")).strip()
+    image_url  = str(card.get("Image URL", "")).strip()
+
+    if not name:
+        log.warning("Skipping card with no name")
+        return None
+
+    log.info("=== Scraping: %s (%s) ===", name, card_set)
+
+    # Find PriceCharting URL if missing
+    if not pc_url or not pc_url.startswith("http"):
+        pc_url = find_pricecharting_url(session, name, card_set)
+        if not pc_url:
+            log.warning("No URL found — skipping %s", name)
+            return None
+
+    time.sleep(REQUEST_DELAY)
+
+    # Fetch the product page
+    try:
+        resp = session.get(pc_url, headers=HEADERS, timeout=REQUEST_TIMEOUT)
+        resp.raise_for_status()
+    except Exception as e:
+        log.error("Failed to fetch %s: %s", pc_url, e)
+        return None
+
+    page_text = resp.text
+    soup = BeautifulSoup(page_text, "html.parser")
+
+    # Extract VGPC.chart_data
+    chart_data = extract_js_object(page_text, "VGPC.chart_data")
+    price_history = parse_chart_data(chart_data) if chart_data else {"ungraded": [], "psa9": [], "psa10": []}
+
+    # Extract volume data
+    volumes = extract_volume(soup)
+    apply_volume(price_history, volumes)
+
+    # Extract PSA population
+    pop_data = extract_js_object(page_text, "VGPC.pop_data")
+    psa_pop = parse_psa_pop(pop_data) if pop_data else {"psa9": None, "psa10": None}
+
+    # Get current price as fallback
+    current_price = extract_current_price(soup)
+
+    # Download image if missing
+    github_image_url = image_url
+    if not github_image_url or "pokemontcg.io" in github_image_url:
+        # Try to download from TCG API image or from pricecharting
+        dl_url = image_url
+        if not dl_url:
+            img_tag = soup.select_one("#product_image img, .product-image img")
+            if img_tag:
+                dl_url = img_tag.get("src", "")
+                if dl_url and not dl_url.startswith("http"):
+                    dl_url = urljoin(PRICECHARTING_BASE, dl_url)
+        github_image_url = download_image(session, dl_url, name, card_set) if dl_url else ""
+
+    return {
+        "cardName": name,
+        "set": card_set,
+        "cardNumber": card_num,
+        "priceHistory": price_history,
+        "psaPop": psa_pop,
+        "currentPrice": current_price,
+        "pcUrl": pc_url,
+        "imageUrl": github_image_url,
+    }
+
+def upload_results(session, result):
+    """Upload scraped data to Google Sheets via Apps Script."""
+    if not APPS_SCRIPT_URL:
+        log.warning("No APPS_SCRIPT_URL set — skipping upload")
+        return
+
+    name = result["cardName"]
+    card_set = result["set"]
+    card_num = result["cardNumber"]
+
+    # Upload price history
+    for cond_key in ("ungraded", "psa9", "psa10"):
+        points = result["priceHistory"].get(cond_key, [])
+        if not points:
+            continue
+        payload = {
+            "action": "updateCardPriceHistory",
+            "cardName": name,
+            "set": card_set,
+            "cardNumber": card_num,
+            "conditionType": cond_key,
+            "priceData": points,
+        }
+        try:
+            api_post(session, "updateCardPriceHistory", payload)
+            log.info("Uploaded %d %s price points for %s", len(points), cond_key, name)
+        except Exception as e:
+            log.error("Failed to upload %s prices for %s: %s", cond_key, name, e)
+
+    # Upload PSA population
+    if result["psaPop"]["psa9"] is not None or result["psaPop"]["psa10"] is not None:
+        payload = {
+            "action": "updatePsaPopulation",
+            "cardName": name,
+            "set": card_set,
+            "cardNumber": card_num,
+            "psa9Pop":  result["psaPop"]["psa9"],
+            "psa10Pop": result["psaPop"]["psa10"],
+        }
+        try:
+            api_post(session, "updatePsaPopulation", payload)
+            log.info("Uploaded PSA pop for %s (9:%s, 10:%s)", name, result["psaPop"]["psa9"], result["psaPop"]["psa10"])
+        except Exception as e:
+            log.error("Failed to upload PSA pop for %s: %s", name, e)
+
+    # Update PriceCharting URL and image URL in Inventory
+    if result["pcUrl"]:
+        try:
+            api_post(session, "updatePriceChartingUrls", {
+                "action": "updatePriceChartingUrls",
+                "cards": [{"cardName": name, "set": card_set, "url": result["pcUrl"]}],
+            })
+        except Exception as e:
+            log.warning("Failed to update PriceCharting URL: %s", e)
+
+    if result["imageUrl"]:
+        try:
+            api_post(session, "updateImageUrls", {
+                "action": "updateImageUrls",
+                "cards": [{"cardName": name, "set": card_set, "imageUrl": result["imageUrl"]}],
+            })
+        except Exception as e:
+            log.warning("Failed to update Image URL: %s", e)
+
+    # Update current price
+    if result["currentPrice"] is not None:
+        try:
+            api_post(session, "updateCurrentPrice", {
+                "action": "updateCurrentPrice",
+                "cardName": name,
+                "set": card_set,
+                "price": result["currentPrice"],
+            })
+        except Exception as e:
+            log.warning("Failed to update current price: %s", e)
+
+
+def main():
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+
+    if not APPS_SCRIPT_URL:
+        log.error("APPS_SCRIPT_URL not set. Export it as an environment variable.")
+        sys.exit(1)
 
     session = requests.Session()
-    session.headers.update(HEADERS)
 
-    # Load inventory
-    log.info("Fetching inventory…")
-    try:
-        result = api_get(session, "getInventory")
-    except Exception as e:
-        log.error("Failed to fetch inventory: %s", e)
+    # Fetch inventory from Google Sheets
+    log.info("Fetching inventory from Google Sheets...")
+    inv_data = api_get(session, "getInventory")
+    if inv_data.get("status") != "success":
+        log.error("Failed to fetch inventory: %s", inv_data.get("message", "unknown error"))
         sys.exit(1)
 
-    if result.get("status") != "success":
-        log.error("API error: %s", result.get("message"))
-        sys.exit(1)
+    cards = inv_data.get("data", [])
+    log.info("Found %d cards in inventory", len(cards))
 
-    inventory = result.get("data", [])
-    if not inventory:
-        log.info("Inventory is empty.")
-        sys.exit(0)
-
-    log.info("Found %d cards.", len(inventory))
-
-    # Filter to a single card if CARD_NAME is set
+    # Filter to single card if CARD_NAME is set
     if CARD_NAME:
-        inventory = [c for c in inventory if c.get("Card Name", "").strip().lower() == CARD_NAME.lower()]
-        if not inventory:
-            log.error("No card found matching CARD_NAME=%r", CARD_NAME)
-            sys.exit(1)
-        log.info("Filtered to %d card(s) matching %r.", len(inventory), CARD_NAME)
+        cards = [c for c in cards if CARD_NAME.lower() in str(c.get("Card Name", "")).lower()]
+        log.info("Filtered to %d card(s) matching '%s'", len(cards), CARD_NAME)
 
-    log.info("")
+    if not cards:
+        log.info("No cards to scrape.")
+        return
 
-    # Download card images and update sheet Image URL column
-    log.info("Downloading card images…")
-    image_updates = download_images(inventory, session)
-    if image_updates:
-        log.info("Updating %d image URL(s)…", len(image_updates))
-        try:
-            res = api_post(session, "updateImageUrls", {"data": image_updates})
-            log.info("  %s", res.get("message", "ok"))
-        except Exception as e:
-            log.error("  Image URL update failed: %s", e)
+    for card in cards:
+        result = scrape_card(session, card)
+        if result:
+            upload_results(session, result)
 
-    log.info("")
-
-    price_updates    = []
-    url_updates      = []   # newly discovered PriceCharting URLs to save back
-    total_value      = 0.0
-    total_cards      = 0
-    highest_card     = None
-    highest_price    = 0.0
-
-    for idx, card in enumerate(inventory):
-        name        = str(card.get("Card Name") or "Unknown")
-        set_name    = str(card.get("Set") or "")
-        card_number = str(card.get("Card Number") or "")
-        url         = str(card.get("PriceCharting URL") or "").strip()
-        row_index   = card.get("_rowIndex")
-        qty         = float(card.get("Quantity") or 1)
-
-        log.info("[%d/%d] %s — %s", idx + 1, len(inventory), name, set_name)
-
-        # Auto-discover URL via search if missing
-        if not url:
-            time.sleep(REQUEST_DELAY)
-            url = search_for_url(name, set_name, session, card_number=card_number)
-            if not url:
-                log.warning("  No URL found — skipping.\n")
-                total_value  += float(card.get("Current Price") or 0) * qty
-                total_cards  += int(qty)
-                continue
-            # Queue the discovered URL so it's saved back to the sheet
-            url_updates.append({"rowIndex": row_index, "url": url})
-            log.info("  URL queued for save: %s", url)
-
-        # Scrape
-        time.sleep(REQUEST_DELAY)
-        try:
-            data = scrape_card(url, session)
-        except Exception as e:
-            log.error("  Scrape error: %s\n", e)
-            total_value += float(card.get("Current Price") or 0) * qty
-            total_cards += int(qty)
-            continue
-
-        current_price = data["currentPrice"] or float(card.get("Current Price") or 0)
-
-        # Queue inventory price update
-        if current_price > 0:
-            price_updates.append({"rowIndex": row_index, "currentPrice": current_price})
-
-        total_value += current_price * qty
-        total_cards += int(qty)
-        if current_price > highest_price:
-            highest_price = current_price
-            highest_card  = name
-
-        # POST price history
-        history = data["priceHistory"]
-        if any(len(v) for v in history.values()):
-            try:
-                res = api_post(session, "updatePriceHistory", {
-                    "cardName":   name,
-                    "set":        set_name,
-                    "cardNumber": card_number,
-                    "history":    history,
-                })
-                log.info("  history → %s", res.get("message", "ok"))
-            except Exception as e:
-                log.error("  history POST failed: %s", e)
-
-        # POST PSA population
-        pop = data["psaPopulation"]
-        if pop.get("psa9") is not None or pop.get("psa10") is not None:
-            try:
-                res = api_post(session, "updatePsaPopulation", {
-                    "cardName":   name,
-                    "set":        set_name,
-                    "cardNumber": card_number,
-                    "psa9Pop":    pop["psa9"],
-                    "psa10Pop":   pop["psa10"],
-                })
-                log.info("  psa pop → %s", res.get("message", "ok"))
-            except Exception as e:
-                log.error("  psa pop POST failed: %s", e)
-
-        log.info("")
-
-    # Save newly discovered PriceCharting URLs back to the sheet
-    if url_updates:
-        log.info("Saving %d discovered PriceCharting URL(s)…", len(url_updates))
-        try:
-            res = api_post(session, "updatePriceChartingUrls", {"data": url_updates})
-            log.info("  %s", res.get("message", "ok"))
-        except Exception as e:
-            log.error("  URL save failed: %s", e)
-
-    # Bulk update current prices
-    if price_updates:
-        log.info("Updating %d current prices…", len(price_updates))
-        try:
-            res = api_post(session, "updatePrices", {"data": price_updates})
-            log.info("  %s", res.get("message", "ok"))
-        except Exception as e:
-            log.error("  Price update failed: %s", e)
-
-    # Portfolio snapshot
-    daily_change = daily_change_pct = 0.0
-    try:
-        snaps = api_get(session, "getPortfolio").get("data", [])
-        if snaps:
-            prev = float(snaps[-1].get("Total Portfolio Value") or 0)
-            daily_change = total_value - prev
-            daily_change_pct = (daily_change / prev * 100) if prev else 0.0
-    except Exception as e:
-        log.warning("Could not fetch snapshots: %s", e)
-
-    today = date.today().isoformat()
-    try:
-        api_post(session, "addSnapshot", {"data": {
-            "date":             today,
-            "totalCards":       total_cards,
-            "totalValue":       round(total_value, 2),
-            "dailyChange":      round(daily_change, 2),
-            "dailyChangePct":   round(daily_change_pct, 4),
-            "highestValueCard": highest_card or "",
-        }})
-        log.info("Snapshot added: %s  $%.2f", today, total_value)
-    except Exception as e:
-        log.error("Snapshot failed: %s", e)
-
-    log.info("\n" + "=" * 64)
-    log.info("Done. Portfolio value: $%.2f", total_value)
-    log.info("=" * 64)
+    log.info("Done! Scraped %d card(s).", len(cards))
 
 
 if __name__ == "__main__":
-    if not APPS_SCRIPT_URL:
-        log.error("Set the APPS_SCRIPT_URL environment variable first.")
-        sys.exit(1)
-    scrape_all()
+    main()

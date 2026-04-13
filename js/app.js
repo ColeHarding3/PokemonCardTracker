@@ -4,6 +4,68 @@
 
 const TCG_API = "https://api.pokemontcg.io/v2/cards";
 
+// ============================================================
+// UTILITY FUNCTIONS
+// ============================================================
+
+function formatCurrency(n, signed = false) {
+  if (n == null || isNaN(n)) return "$0.00";
+  const abs = Math.abs(n);
+  const formatted = "$" + abs.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  if (signed) return (n >= 0 ? "+" : "-") + formatted;
+  return n < 0 ? "-" + formatted : formatted;
+}
+
+function formatPct(n, signed = false) {
+  if (n == null || isNaN(n)) return "0.0%";
+  const abs = Math.abs(n).toFixed(1);
+  if (signed) return (n >= 0 ? "+" : "-") + abs + "%";
+  return (n < 0 ? "-" : "") + abs + "%";
+}
+
+function setText(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = val != null ? val : "";
+}
+
+function getFormVal(id) {
+  const el = document.getElementById(id);
+  return el ? el.value.trim() : "";
+}
+
+function fillFormField(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.value = val != null ? String(val) : "";
+}
+
+function showToast(msg, type = "success") {
+  let toast = document.getElementById("toast");
+  if (!toast) {
+    toast = document.createElement("div");
+    toast.id = "toast";
+    toast.style.cssText = "position:fixed;bottom:24px;right:24px;padding:12px 20px;border-radius:8px;color:#fff;font-size:14px;z-index:10000;transition:opacity 0.3s;pointer-events:none;";
+    document.body.appendChild(toast);
+  }
+  toast.textContent = msg;
+  toast.style.background = type === "error" ? "#ff4444" : "#00c851";
+  toast.style.opacity = "1";
+  clearTimeout(toast._timer);
+  toast._timer = setTimeout(() => { toast.style.opacity = "0"; }, 3500);
+}
+
+function showGlobalLoader(show) {
+  const el = document.getElementById("global-loader");
+  if (el) el.style.display = show ? "flex" : "none";
+}
+
+function showError(msg) {
+  const el = document.getElementById("error-banner");
+  if (el) {
+    el.textContent = msg;
+    el.style.display = msg ? "block" : "none";
+  }
+}
+
 let state = {
   // Dashboard data
   dashboard: null,
@@ -1117,99 +1179,10 @@ function setupEventListeners() {
   const form = document.getElementById("card-form");
   if (form) form.addEventListener("submit", submitCardForm);
 
-  // Add/edit modal close on backdrop
-  document.getElementById("card-modal").addEventListener("click", e => { if (e.target === e.currentTarget) closeModal(); });
-
-  // Detail modal close on backdrop
-  document.getElementById("card-detail-modal").addEventListener("click", e => { if (e.target === e.currentTarget) closeDetailModal(); });
-
-  // Confirm dialog
-  document.getElementById("confirm-yes").addEventListener("click", executeDelete);
-  document.getElementById("confirm-no").addEventListener("click",  closeConfirm);
-
-  // Update URL button
-  const updateUrlBtn = document.getElementById("update-url-btn");
-  if (updateUrlBtn) {
-    updateUrlBtn.addEventListener("click", () => {
-      const newUrl = prompt("Enter your new Apps Script URL:");
-      if (newUrl && newUrl.startsWith("https://")) {
-        localStorage.setItem("APPS_SCRIPT_URL", newUrl);
-        CONFIG.APPS_SCRIPT_URL = newUrl;
-        showToast("URL updated. Reloading…");
-        setTimeout(loadDashboard, 500);
-      }
+  // Modal backdrop close (click outside modal-box to close)
+  document.querySelectorAll(".modal-overlay").forEach(overlay => {
+    overlay.addEventListener("click", e => {
+      if (e.target === overlay) overlay.classList.remove("open");
     });
-  }
-
-  // Refresh All Prices button
-  const refreshAllBtn = document.getElementById("refresh-all-btn");
-  if (refreshAllBtn) refreshAllBtn.addEventListener("click", () => triggerScrape());
-
-  // Refresh This Card button (inside detail modal)
-  const refreshCardBtn = document.getElementById("refresh-card-btn");
-  if (refreshCardBtn) {
-    refreshCardBtn.addEventListener("click", () => {
-      const cardName = state.detailCard && state.detailCard["Card Name"];
-      if (cardName) triggerScrape(cardName);
-    });
-  }
-}
-
-// ============================================================
-// UTILITIES
-// ============================================================
-
-function formatCurrency(val, signed = false) {
-  const n = parseFloat(val) || 0;
-  const prefix = signed && n > 0 ? "+" : "";
-  return prefix + new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2 }).format(n);
-}
-
-function formatPct(val, signed = false) {
-  const n = parseFloat(val) || 0;
-  return (signed && n > 0 ? "+" : "") + n.toFixed(2) + "%";
-}
-
-function escHtml(str) {
-  return String(str).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
-}
-
-function setText(id, value) {
-  const el = document.getElementById(id);
-  if (el) el.textContent = value;
-}
-
-function getFormVal(id) {
-  const el = document.getElementById(id);
-  return el ? el.value : "";
-}
-
-function fillFormField(id, value) {
-  const el = document.getElementById(id);
-  if (!el) return;
-  if (el.type === "checkbox") el.checked = !!value;
-  else el.value = value || "";
-}
-
-function showGlobalLoader(show) {
-  const el = document.getElementById("global-loader");
-  if (el) el.style.display = show ? "flex" : "none";
-}
-
-function showError(msg)  { showToast(msg, "error"); }
-
-function showToast(msg, type = "success") {
-  const container = document.getElementById("toast-container");
-  if (!container) return;
-  const toast = document.createElement("div");
-  toast.className = "toast toast-" + type;
-  toast.textContent = msg;
-  container.appendChild(toast);
-  setTimeout(() => toast.classList.add("visible"), 10);
-  setTimeout(() => { toast.classList.remove("visible"); setTimeout(() => toast.remove(), 300); }, 3500);
-}
-
-function updateLastUpdated() {
-  const el = document.getElementById("last-updated");
-  if (el) el.textContent = "Updated " + new Date().toLocaleTimeString();
+  });
 }
