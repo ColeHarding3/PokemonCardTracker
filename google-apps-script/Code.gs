@@ -259,6 +259,10 @@ function doPost(e) {
         return jsonResponse(updatePsaPopulation(body));
       case "updateImageUrls":
         return jsonResponse(updateImageUrls(body.data));
+      case "triggerScrape":
+        return jsonResponse(triggerGitHubScrape(null));
+      case "triggerScrapeCard":
+        return jsonResponse(triggerGitHubScrape(body.cardName || null));
       default:
         return jsonResponse({ status: "error", message: "Unknown action: " + action });
     }
@@ -556,6 +560,46 @@ function updatePsaPopulation(body) {
   // New row
   sheet.appendRow([cardName, set, cardNumber, psa9Pop, psa10Pop, timestamp]);
   return { status: "success", message: "PSA population added" };
+}
+
+// ============================================================
+// GITHUB ACTIONS TRIGGER
+// ============================================================
+
+function triggerGitHubScrape(cardName) {
+  var token = PropertiesService.getScriptProperties().getProperty("GITHUB_TOKEN");
+  if (!token) {
+    return { status: "error", message: "GITHUB_TOKEN script property not set. See SETUP.md for instructions." };
+  }
+
+  var url = "https://api.github.com/repos/Coleharding3/pokemoncardtracker/actions/workflows/scrape.yml/dispatches";
+  var payload = { ref: "main" };
+  if (cardName) {
+    payload.inputs = { card_name: cardName };
+  }
+
+  var options = {
+    method: "post",
+    contentType: "application/json",
+    headers: {
+      Authorization: "Bearer " + token,
+      Accept: "application/vnd.github+json",
+      "X-GitHub-Api-Version": "2022-11-28",
+    },
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true,
+  };
+
+  var response = UrlFetchApp.fetch(url, options);
+  var code = response.getResponseCode();
+
+  if (code === 204) {
+    return { status: "success", message: cardName ? "Scrape triggered for: " + cardName : "Full scrape triggered" };
+  } else {
+    var body = "";
+    try { body = JSON.parse(response.getContentText()).message; } catch (e) {}
+    return { status: "error", message: "GitHub API error " + code + (body ? ": " + body : "") };
+  }
 }
 
 // ============================================================

@@ -117,10 +117,43 @@ This lets the weekly price-scraper job know where to send updates.
 
 ---
 
-## Step 8: Manually trigger the price scraper (optional)
+## Step 8: Store your GitHub PAT in Apps Script (for the Refresh buttons)
+
+The **↻ Refresh Prices** and **↻ Refresh This Card** buttons on the website trigger GitHub Actions on demand. They work by calling your Apps Script, which in turn calls the GitHub API — keeping your token server-side and out of the browser.
+
+### Create a Personal Access Token
+
+1. Go to **GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic)**.
+2. Click **Generate new token (classic)**.
+3. Give it a name like `pokemon-card-tracker`.
+4. Under **Scopes**, check **`workflow`** (this covers reading and writing GitHub Actions).
+5. Click **Generate token** and copy the value — you won't see it again.
+
+> Alternatively, use a **fine-grained token** with **Actions: Read and Write** permission scoped to the `pokemoncardtracker` repository.
+
+### Store the token in Apps Script
+
+1. In the Apps Script editor, click the **gear icon ⚙️** (Project Settings) in the left sidebar.
+2. Scroll down to **Script Properties**.
+3. Click **Add script property**.
+4. Set:
+   - **Property**: `GITHUB_TOKEN`
+   - **Value**: paste your Personal Access Token
+5. Click **Save script properties**.
+
+The token is stored securely server-side and is never exposed in your website's source code.
+
+---
+
+## Step 9: Manually trigger the price scraper (optional)
 
 You don't have to wait until Sunday — you can run it anytime:
 
+**From the website** (after completing Step 8):
+- Click **↻ Refresh Prices** in the top-right header to refresh all cards.
+- Open any card's detail view and click **↻ Refresh This Card** to refresh just that one card.
+
+**From GitHub directly**:
 1. Go to your repository on GitHub.
 2. Click the **Actions** tab.
 3. Click **Scrape Pokemon Card Prices** in the left sidebar.
@@ -149,6 +182,7 @@ Your card will appear in the inventory table immediately!
 | Website shows "Failed to load data" | Make sure your Apps Script is deployed with "Anyone" access |
 | Cards aren't saving | Re-deploy the Apps Script (Step 4), bump the version |
 | Prices not updating | Check the GitHub Actions tab for error logs |
+| Refresh buttons show "GITHUB_TOKEN not set" | Complete Step 8 to add the PAT as a Script Property, then re-deploy the Apps Script |
 | Sheet tabs are missing | Run `setupSheet()` in the Apps Script editor (Step 3) |
 
 ---
