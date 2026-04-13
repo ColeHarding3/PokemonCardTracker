@@ -498,7 +498,15 @@ function renderChart() {
         tooltip: {
           backgroundColor: "#1a1a2e", borderColor: "#333366", borderWidth: 1,
           titleColor: "#aaa", bodyColor: "#fff",
-          callbacks: { label: ctx => " " + formatCurrency(ctx.parsed.y) },
+          callbacks: {
+            title: function(items) {
+              const label = items[0] && items[0].label;
+              if (!label) return "";
+              const parts = label.split("-");
+              return new Date(+parts[0], +parts[1] - 1, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" });
+            },
+            label: ctx => " " + formatCurrency(ctx.parsed.y),
+          },
         },
       },
       scales: {
@@ -731,7 +739,15 @@ function renderDetailPriceChart(data, range) {
         legend: { display: false },
         tooltip: {
           backgroundColor: "#1a1a2e", borderColor: "#333366", borderWidth: 1,
-          callbacks: { label: ctx => ` ${ctx.dataset.label}: ${formatCurrency(ctx.parsed.y)}` },
+          callbacks: {
+            title: function(items) {
+              const label = items[0] && items[0].label;
+              if (!label) return "";
+              const [yr, mo] = label.split("-");
+              return new Date(+yr, +mo - 1, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" });
+            },
+            label: ctx => ` ${ctx.dataset.label}: ${formatCurrency(ctx.parsed.y)}`,
+          },
         },
       },
       scales: {
@@ -778,7 +794,16 @@ function renderDetailVolumeChart(data, range) {
     data: { labels: allDates, datasets },
     options: {
       responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false }, tooltip: { backgroundColor: "#1a1a2e" } },
+      plugins: { legend: { display: false }, tooltip: { backgroundColor: "#1a1a2e",
+        callbacks: {
+          title: function(items) {
+            const label = items[0] && items[0].label;
+            if (!label) return "";
+            const [yr, mo] = label.split("-");
+            return new Date(+yr, +mo - 1, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" });
+          },
+        },
+      }},
       scales: {
         x: { stacked: true, grid: { color: CONFIG.CHART_COLORS.gridLine }, ticks: { color: "#888", maxTicksLimit: 8,
           callback: function(value) {

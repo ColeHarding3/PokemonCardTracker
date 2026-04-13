@@ -27,7 +27,9 @@ REQUEST_DELAY    = 2.5   # seconds between page fetches — be polite
 REQUEST_TIMEOUT  = 20
 
 GITHUB_PAGES_BASE = "https://coleharding3.github.io/pokemoncardtracker"
-IMAGES_DIR        = Path("images/cards")
+# Anchor to the repo root (two levels up from scraper/) so the path is correct
+# regardless of which directory the script is invoked from.
+IMAGES_DIR        = Path(__file__).resolve().parent.parent / "images" / "cards"
 
 HEADERS = {
     "User-Agent": (
@@ -362,13 +364,16 @@ def derive_image_filename(image_url):
 
 def download_images(inventory, session):
     """
-    Download card images from TCG API URLs to images/cards/.
+    Download card images from TCG API URLs to images/cards/ in the repo root.
     Returns list of {rowIndex, imageUrl} dicts with GitHub Pages URLs for cards
     whose image was newly saved (or already existed on disk).
     Only processes cards that have an image URL pointing to pokemontcg.io.
     """
     IMAGES_DIR.mkdir(parents=True, exist_ok=True)
+    log.info("  Image directory: %s", IMAGES_DIR)
+
     updates = []
+    newly_saved = []
 
     for card in inventory:
         image_url = (card.get("Image URL") or "").strip()
@@ -381,6 +386,7 @@ def download_images(inventory, session):
 
         # Skip download if already on disk
         if local_path.exists():
+            log.info("  image already cached: %s", filename)
             updates.append({"rowIndex": card["_rowIndex"], "imageUrl": gh_url})
             continue
 
@@ -389,11 +395,18 @@ def download_images(inventory, session):
             resp = session.get(image_url, timeout=REQUEST_TIMEOUT)
             resp.raise_for_status()
             local_path.write_bytes(resp.content)
-            log.info("  image saved: %s", filename)
+            log.info("  image saved: %s (%d bytes)", filename, len(resp.content))
             updates.append({"rowIndex": card["_rowIndex"], "imageUrl": gh_url})
+            newly_saved.append(local_path)
         except Exception as e:
             log.warning("  image download failed (%s): %s", filename, e)
 
+    if newly_saved:
+        log.info(
+            "  %d new image(s) saved to %s — "
+            "commit and push images/cards/ to make them live on GitHub Pages.",
+            len(newly_saved), IMAGES_DIR,
+        )
     return updates
 
 
