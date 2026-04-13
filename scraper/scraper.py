@@ -26,7 +26,7 @@ CARD_NAME        = os.environ.get("CARD_NAME", "").strip()   # if set, only scra
 REQUEST_DELAY    = 2.5   # seconds between page fetches — be polite
 REQUEST_TIMEOUT  = 20
 
-GITHUB_PAGES_BASE = "https://coleharding3.github.io/pokemoncardtracker"
+GITHUB_PAGES_BASE = "https://coleharding3.github.io/PokemonCardTracker"
 # Anchor to the repo root (two levels up from scraper/) so the path is correct
 # regardless of which directory the script is invoked from.
 IMAGES_DIR        = Path(__file__).resolve().parent.parent / "images" / "cards"

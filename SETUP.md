@@ -98,7 +98,7 @@ This makes your website publicly viewable.
 5. Under **Branch**, choose **main** and click **Save**.
 6. After a minute or two, your site will be live at:
    ```
-   https://coleharding3.github.io/pokemoncardtracker/
+   https://coleharding3.github.io/PokemonCardTracker/
    ```
 
 ---

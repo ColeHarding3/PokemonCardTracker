@@ -1,6 +1,6 @@
 # Pokemon Card Portfolio Tracker
 
-**Live site: https://coleharding3.github.io/pokemoncardtracker/**
+**Live site: https://coleharding3.github.io/PokemonCardTracker/**
 
 Track your Pokemon card collection — current market values, price history, PSA population data, and portfolio growth over time.
 
