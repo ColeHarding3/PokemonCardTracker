@@ -399,7 +399,7 @@ function renderTable() {
       <td>
         <div class="card-name-cell">
           ${imgUrl
-            ? `<img src="${escHtml(imgUrl)}" alt="${escHtml(card["Card Name"] || "")}" class="card-thumb" loading="lazy" />`
+            ? `<img src="${escHtml(imgUrl)}" alt="${escHtml(card["Card Name"] || "")}" class="card-thumb" loading="lazy" onerror="this.style.display='none'" />`
             : `<div class="card-thumb-placeholder"></div>`}
           <div class="card-name-info">
             <span class="card-name">${escHtml(card["Card Name"] || "")}</span>
@@ -587,6 +587,7 @@ function openCardDetail(rowIndex) {
   if (imgEl) {
     imgEl.src   = card["Image URL"] || "";
     imgEl.style.display = card["Image URL"] ? "block" : "none";
+    imgEl.onerror = function() { this.style.display = "none"; };
   }
 
   // Stats

@@ -127,7 +127,19 @@ function getInventory() {
   var data = sheet.getDataRange().getValues();
   if (data.length <= 1) return { status: "success", data: [] };
 
-  var headers = data[0];
+  var headers = data[0].slice(); // copy so we can patch without mutating sheet data
+  // Migration safety: if the sheet predates the Image URL column, col 16 header is
+  // an empty string but the data rows may still have a URL there (written by addCard).
+  // Map it correctly so card["Image URL"] is never undefined on the frontend.
+  var EXPECTED_HEADERS = [
+    "Row", "Card Name", "Set", "Card Number", "Condition", "Quantity",
+    "Graded", "PSA Grade", "Purchase Price", "Purchase Date", "Current Price",
+    "Total Value", "PriceCharting URL", "Date Added", "Notes", "Image URL"
+  ];
+  for (var k = 0; k < EXPECTED_HEADERS.length; k++) {
+    if (!headers[k]) headers[k] = EXPECTED_HEADERS[k];
+  }
+
   var rows = [];
   for (var i = 1; i < data.length; i++) {
     var row = {};
