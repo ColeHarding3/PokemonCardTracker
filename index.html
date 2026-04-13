@@ -295,34 +295,47 @@
             </div>
 
             <!-- Always-shown fields -->
-            <div class="form-group">
+
+            <!-- Graded toggle -->
+            <div class="form-group span-2">
+              <label>Card Type</label>
+              <div class="condition-toggle">
+                <button type="button" id="toggle-ungraded" class="toggle-btn active" onclick="setGradedMode(false)">Ungraded</button>
+                <button type="button" id="toggle-graded"   class="toggle-btn"        onclick="setGradedMode(true)">PSA Graded</button>
+              </div>
+            </div>
+
+            <!-- Ungraded: condition dropdown -->
+            <div class="form-group" id="field-condition-wrap">
               <label for="field-condition">Condition</label>
               <select id="field-condition">
-                <option value="Mint">Mint</option>
-                <option value="NM" selected>Near Mint (NM)</option>
-                <option value="LP">Lightly Played (LP)</option>
-                <option value="MP">Moderately Played (MP)</option>
-                <option value="HP">Heavily Played (HP)</option>
-                <option value="Damaged">Damaged</option>
+                <option value="NM" selected>NM — Near Mint</option>
+                <option value="LP">LP — Lightly Played</option>
+                <option value="MP">MP — Moderately Played</option>
+              </select>
+            </div>
+
+            <!-- PSA Graded: grade dropdown -->
+            <div class="form-group" id="field-psa-wrap" style="display:none">
+              <label for="field-psa">PSA Grade</label>
+              <select id="field-psa">
+                <option value="">Select grade…</option>
+                <option value="10">10 — Gem Mint</option>
+                <option value="9">9 — Mint</option>
+                <option value="8">8 — NM-Mint</option>
+                <option value="7">7 — Near Mint</option>
+                <option value="6">6 — EX-Mint</option>
+                <option value="5">5 — Excellent</option>
+                <option value="4">4 — Very Good-Excellent</option>
+                <option value="3">3 — Very Good</option>
+                <option value="2">2 — Good</option>
+                <option value="1">1 — Poor</option>
               </select>
             </div>
 
             <div class="form-group">
               <label for="field-qty">Quantity</label>
               <input id="field-qty" type="number" min="1" value="1" />
-            </div>
-
-            <div class="form-group">
-              <label>Graded Card?</label>
-              <div class="checkbox-group">
-                <input id="field-graded" type="checkbox" />
-                <label for="field-graded">Professionally graded</label>
-              </div>
-            </div>
-
-            <div class="form-group">
-              <label for="field-psa">PSA Grade</label>
-              <input id="field-psa" type="number" min="1" max="10" placeholder="1–10" />
             </div>
 
             <div class="form-group">

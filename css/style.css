@@ -808,6 +808,45 @@ tbody td {
   .brand-name { display: none; }
 }
 
+/* ============================================================ CONDITION TOGGLE */
+
+.condition-toggle {
+  display: flex;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 3px;
+  gap: 3px;
+  width: fit-content;
+}
+
+.toggle-btn {
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 20px;
+  transition: background 0.15s, color 0.15s;
+}
+
+.toggle-btn:hover {
+  color: var(--text-primary);
+}
+
+.toggle-btn.active {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+}
+
+.toggle-btn.active[id="toggle-graded"] {
+  background: rgba(232,185,35,0.12);
+  color: var(--accent);
+}
+
 /* ============================================================ SEARCH MODAL */
 
 .modal-box-wide {

@@ -233,6 +233,19 @@ function setSearchState(state, errorMsg) {
 
 // setCardFormReadOnly: in "add" mode, card identity fields are hidden (shown in banner)
 // in "edit" mode, all fields are shown
+function setGradedMode(graded) {
+  const ungradedBtn = document.getElementById("toggle-ungraded");
+  const gradedBtn   = document.getElementById("toggle-graded");
+  const condWrap    = document.getElementById("field-condition-wrap");
+  const psaWrap     = document.getElementById("field-psa-wrap");
+  if (!ungradedBtn) return;
+
+  ungradedBtn.classList.toggle("active", !graded);
+  gradedBtn.classList.toggle("active",   graded);
+  condWrap.style.display = graded ? "none"  : "";
+  psaWrap.style.display  = graded ? ""      : "none";
+}
+
 function setCardFormReadOnly(isEdit) {
   const addOnlyFields = document.querySelectorAll(".form-add-hidden");
   const editOnlyFields = document.querySelectorAll(".form-edit-only");
@@ -539,6 +552,8 @@ function openAddModal() {
   document.getElementById("card-form").reset();
   // Default purchase date to today
   document.getElementById("field-purchase-date").value = new Date().toISOString().slice(0, 10);
+  // Reset condition toggle to Ungraded
+  setGradedMode(false);
 
   // Reset search
   const input = document.getElementById("tcg-search-input");
@@ -566,10 +581,14 @@ function openEditModal(rowIndex) {
   fillFormField("field-name", card["Card Name"]);
   fillFormField("field-set", card["Set"]);
   fillFormField("field-number", card["Card Number"]);
-  fillFormField("field-condition", card["Condition"]);
   fillFormField("field-qty", card["Quantity"]);
-  fillFormField("field-graded", card["Graded"] === "Yes");
-  fillFormField("field-psa", card["PSA Grade"]);
+  const isPsa = String(card["Condition"] || "").startsWith("PSA");
+  setGradedMode(isPsa);
+  if (isPsa) {
+    fillFormField("field-psa", card["PSA Grade"] || String(card["Condition"]).replace("PSA ", ""));
+  } else {
+    fillFormField("field-condition", card["Condition"]);
+  }
   fillFormField("field-purchase-price", card["Purchase Price"]);
   fillFormField("field-purchase-date", card["Purchase Date"]);
   fillFormField("field-current-price", card["Current Price"]);
@@ -617,14 +636,20 @@ async function submitCardForm(e) {
     ? (state.selectedTcgCard.number || "")
     : getFormVal("field-number");
 
+  const isGraded = document.getElementById("toggle-graded").classList.contains("active");
+  const psaGrade = isGraded ? getFormVal("field-psa") : "";
+  const condition = isGraded
+    ? (psaGrade ? `PSA ${psaGrade}` : "PSA")
+    : getFormVal("field-condition");
+
   const data = {
     cardName,
     set: cardSet,
     cardNumber,
-    condition: getFormVal("field-condition"),
+    condition,
     quantity: getFormVal("field-qty"),
-    graded: document.getElementById("field-graded").checked,
-    psaGrade: getFormVal("field-psa"),
+    graded: isGraded,
+    psaGrade,
     purchasePrice: getFormVal("field-purchase-price"),
     purchaseDate: getFormVal("field-purchase-date"),
     currentPrice: getFormVal("field-current-price"),
