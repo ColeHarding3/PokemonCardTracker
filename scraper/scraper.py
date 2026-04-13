@@ -313,11 +313,11 @@ def find_pricecharting_url(session, card_name, card_set=""):
         if products:
             # Pick the first (best) match
             p = products[0]
-            product_url = p.get("url", "")
-            if product_url and not product_url.startswith("http"):
-                product_url = urljoin(PRICECHARTING_BASE, product_url)
-            log.info("Found URL: %s", product_url)
-            return product_url
+            product_id = p.get("id", "")
+            if product_id:
+                product_url = f"{PRICECHARTING_BASE}/offers?product={product_id}"
+                log.info("Found URL: %s", product_url)
+                return product_url
     except Exception as e:
         log.warning("PriceCharting search failed: %s", e)
     return None
