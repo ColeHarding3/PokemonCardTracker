@@ -8,7 +8,6 @@ let state = {
   // Dashboard data
   dashboard: null,
   inventory: [],
-  snapshots: [],
   psaPopulation: {},
 
   // Table
@@ -26,7 +25,6 @@ let state = {
   chartInstance: null,
   chartRange: "ALL",
   allPriceHistory: null,   // cached getAllPriceHistory data
-  chartMode: "snapshots",  // "snapshots" | "calculated"
 
   // Card detail modal
   detailCard: null,
@@ -237,11 +235,13 @@ function setGradedMode(graded) {
 async function loadDashboard() {
   showGlobalLoader(true);
   try {
-    const result = await apiFetch("getDashboard");
+    const [result] = await Promise.all([
+      apiFetch("getDashboard"),
+      loadAllPriceHistory(),   // fetch in parallel so chart renders immediately
+    ]);
     if (result.status !== "success") throw new Error(result.message);
     state.dashboard     = result.data;
     state.inventory     = result.data.inventory || [];
-    state.snapshots     = result.data.snapshots || [];
     state.psaPopulation = result.data.psaPopulation || {};
     renderAll();
   } catch (err) {
@@ -429,41 +429,54 @@ function renderTable() {
 // ============================================================
 
 function renderChart() {
-  const canvas = document.getElementById("portfolio-chart");
+  const canvas   = document.getElementById("portfolio-chart");
+  const noDataEl = document.getElementById("chart-no-data");
   if (!canvas || !window.Chart) return;
 
-  let labels, values;
+  function showNoData(msg) {
+    canvas.style.display = "none";
+    if (noDataEl) { noDataEl.style.display = "flex"; noDataEl.textContent = msg || ""; }
+    if (state.chartInstance) { state.chartInstance.destroy(); state.chartInstance = null; }
+  }
 
-  if (state.chartMode === "calculated" && state.allPriceHistory) {
-    const calc = calculateHistoricalPortfolio(state.allPriceHistory, state.inventory);
-    labels = calc.map(p => p.date);
-    values = calc.map(p => p.value);
-  } else {
-    let snapshots = [...state.snapshots];
-    const rangeDays = { "1W":7,"1M":30,"3M":90,"6M":180,"1Y":365,"ALL":Infinity }[state.chartRange] || Infinity;
-    if (rangeDays !== Infinity) {
-      const cutoff = new Date(Date.now() - rangeDays * 86400000);
-      snapshots = snapshots.filter(s => new Date(s["Date"]) >= cutoff);
-    }
-    labels = snapshots.map(s => s["Date"]);
-    values = snapshots.map(s => parseFloat(s["Total Portfolio Value"]) || 0);
+  if (!state.allPriceHistory || !state.allPriceHistory.length) {
+    showNoData("Run the price scraper to see portfolio history.");
+    return;
+  }
 
-    if (state.dashboard && state.dashboard.totalValue) {
-      const today = new Date().toISOString().slice(0, 10);
-      if (!labels.includes(today)) { labels.push(today); values.push(state.dashboard.totalValue); }
+  let calc = calculateHistoricalPortfolio(state.allPriceHistory, state.inventory);
+
+  // Apply range filter (month-based cutoff)
+  if (state.chartRange !== "ALL") {
+    const monthsBack = { "1W": 1, "1M": 1, "3M": 3, "6M": 6, "1Y": 12 }[state.chartRange] || 0;
+    if (monthsBack > 0) {
+      const now = new Date();
+      const c   = new Date(now.getFullYear(), now.getMonth() - monthsBack, 1);
+      const cutoffStr = c.getFullYear() + "-" + String(c.getMonth() + 1).padStart(2, "0");
+      calc = calc.filter(p => p.date >= cutoffStr);
     }
   }
 
+  if (!calc.length) {
+    showNoData("No price history data for this time range.");
+    return;
+  }
+
+  canvas.style.display = "";
+  if (noDataEl) noDataEl.style.display = "none";
+
+  const labels = calc.map(p => p.date);
+  const values = calc.map(p => p.value);
+
   const gainColor = CONFIG.CHART_COLORS.gain;
   const lossColor = CONFIG.CHART_COLORS.loss;
-  const firstVal  = values[0] || 0;
-  const lastVal   = values[values.length - 1] || 0;
-  const lineColor = lastVal >= firstVal ? gainColor : lossColor;
+  const lineColor = (values[values.length - 1] || 0) >= (values[0] || 0) ? gainColor : lossColor;
 
   if (state.chartInstance) {
     state.chartInstance.data.labels = labels;
     state.chartInstance.data.datasets[0].data = values;
     state.chartInstance.data.datasets[0].borderColor = lineColor;
+    state.chartInstance.data.datasets[0].backgroundColor = lineColor + "22";
     state.chartInstance.update("none");
     return;
   }
@@ -554,24 +567,6 @@ function calculateHistoricalPortfolio(allHistory, inventory) {
     results.push({ date: month, value: totalValue });
   }
   return results;
-}
-
-async function toggleChartMode() {
-  if (state.chartMode === "snapshots") {
-    state.chartMode = "calculated";
-    const btn = document.getElementById("chart-mode-btn");
-    if (btn) btn.textContent = "Using: Price History";
-    // Load all price history if not cached
-    showGlobalLoader(true);
-    await loadAllPriceHistory();
-    showGlobalLoader(false);
-  } else {
-    state.chartMode = "snapshots";
-    const btn = document.getElementById("chart-mode-btn");
-    if (btn) btn.textContent = "Use Price History";
-  }
-  if (state.chartInstance) { state.chartInstance.destroy(); state.chartInstance = null; }
-  renderChart();
 }
 
 // ============================================================
@@ -1083,10 +1078,6 @@ function setupEventListeners() {
       }
     });
   }
-
-  // Chart mode toggle button
-  const chartModeBtn = document.getElementById("chart-mode-btn");
-  if (chartModeBtn) chartModeBtn.addEventListener("click", toggleChartMode);
 
   // Refresh All Prices button
   const refreshAllBtn = document.getElementById("refresh-all-btn");

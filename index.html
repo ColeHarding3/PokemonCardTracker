@@ -90,8 +90,6 @@
       <div class="panel">
         <div class="panel-header">
           <span class="panel-title">Portfolio Value Over Time</span>
-          <div style="display:flex;align-items:center;gap:10px">
-          <button id="chart-mode-btn" class="btn btn-ghost btn-sm" style="font-size:11px">Use Price History</button>
           <div class="range-btns">
             <button class="range-btn" data-range="1W">1W</button>
             <button class="range-btn" data-range="1M">1M</button>
@@ -100,11 +98,11 @@
             <button class="range-btn" data-range="1Y">1Y</button>
             <button class="range-btn active" data-range="ALL">ALL</button>
           </div>
-          </div>
         </div>
         <div class="panel-body">
           <div class="chart-wrapper">
             <canvas id="portfolio-chart"></canvas>
+            <div id="chart-no-data" style="display:none;align-items:center;justify-content:center;height:100%;color:#666;font-size:14px;text-align:center;padding:20px"></div>
           </div>
         </div>
       </div>
