@@ -487,9 +487,22 @@ function updateCardPriceHistory(body) {
   if (rowsToAdd.length > 0) {
     var startRow = sheet.getLastRow() + 1;
     sheet.getRange(startRow, 1, rowsToAdd.length, 7).setValues(rowsToAdd);
+    // Force the Date column (col 5) to plain text so Sheets doesn't
+    // auto-convert "2025-01" strings into Date objects on read-back.
+    sheet.getRange(2, 5, sheet.getLastRow() - 1, 1).setNumberFormat("@");
   }
 
   return { status: "success", message: "Price history updated: " + rowsToAdd.length + " rows" };
+}
+
+// Sheets auto-converts "YYYY-MM" strings to Date objects; normalise back to "YYYY-MM".
+function normaliseDateCell(raw) {
+  if (raw instanceof Date) {
+    var yr = raw.getFullYear();
+    var mo = ("0" + (raw.getMonth() + 1)).slice(-2);
+    return yr + "-" + mo;
+  }
+  return raw.toString();
 }
 
 function getCardPriceHistoryData(params) {
@@ -512,7 +525,7 @@ function getCardPriceHistoryData(params) {
     var condType = row[3].toString();
     if (!result[condType]) continue;
     result[condType].push({
-      date:   row[4].toString(),
+      date:   normaliseDateCell(row[4]),
       price:  parseFloat(row[5]) || 0,
       volume: row[6] !== "" ? parseInt(row[6]) : null
     });
@@ -542,7 +555,7 @@ function getAllPriceHistoryData() {
       set:           row[1].toString(),
       cardNumber:    row[2].toString(),
       conditionType: row[3].toString(),
-      date:          row[4].toString(),
+      date:          normaliseDateCell(row[4]),
       price:         parseFloat(row[5]) || 0,
       volume:        row[6] !== "" ? parseInt(row[6]) : null
     });
