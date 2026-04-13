@@ -13,6 +13,7 @@ import re
 import logging
 import requests
 from datetime import datetime, timezone, date
+from pathlib import Path
 from urllib.parse import quote_plus, urljoin
 from bs4 import BeautifulSoup
 
@@ -20,9 +21,13 @@ from bs4 import BeautifulSoup
 # CONFIG
 # ============================================================
 
-APPS_SCRIPT_URL = os.environ.get("APPS_SCRIPT_URL", "")
-REQUEST_DELAY   = 2.5   # seconds between page fetches — be polite
-REQUEST_TIMEOUT = 20
+APPS_SCRIPT_URL  = os.environ.get("APPS_SCRIPT_URL", "")
+CARD_NAME        = os.environ.get("CARD_NAME", "").strip()   # if set, only scrape this card
+REQUEST_DELAY    = 2.5   # seconds between page fetches — be polite
+REQUEST_TIMEOUT  = 20
+
+GITHUB_PAGES_BASE = "https://coleharding3.github.io/pokemoncardtracker"
+IMAGES_DIR        = Path("images/cards")
 
 HEADERS = {
     "User-Agent": (
@@ -341,6 +346,57 @@ def scrape_card(url, session):
         "productId": product_id,
     }
 
+def derive_image_filename(image_url):
+    """
+    Convert a Pokemon TCG API image URL to a local filename.
+    e.g. https://images.pokemontcg.io/swsh7/215_hires.png -> swsh7-215_hires.png
+    Falls back to a sanitized basename if the pattern doesn't match.
+    """
+    m = re.search(r"images\.pokemontcg\.io/([^/]+)/([^/?#]+)", image_url or "")
+    if m:
+        return f"{m.group(1)}-{m.group(2)}"
+    # Fallback: strip query params and use the last path component
+    basename = image_url.rstrip("/").split("/")[-1].split("?")[0]
+    return re.sub(r"[^\w.\-]", "_", basename) or "card.png"
+
+
+def download_images(inventory, session):
+    """
+    Download card images from TCG API URLs to images/cards/.
+    Returns list of {rowIndex, imageUrl} dicts with GitHub Pages URLs for cards
+    whose image was newly saved (or already existed on disk).
+    Only processes cards that have an image URL pointing to pokemontcg.io.
+    """
+    IMAGES_DIR.mkdir(parents=True, exist_ok=True)
+    updates = []
+
+    for card in inventory:
+        image_url = (card.get("Image URL") or "").strip()
+        if not image_url or "pokemontcg.io" not in image_url:
+            continue
+
+        filename = derive_image_filename(image_url)
+        local_path = IMAGES_DIR / filename
+        gh_url = f"{GITHUB_PAGES_BASE}/images/cards/{filename}"
+
+        # Skip download if already on disk
+        if local_path.exists():
+            updates.append({"rowIndex": card["_rowIndex"], "imageUrl": gh_url})
+            continue
+
+        try:
+            time.sleep(REQUEST_DELAY * 0.4)  # lighter delay for image CDN
+            resp = session.get(image_url, timeout=REQUEST_TIMEOUT)
+            resp.raise_for_status()
+            local_path.write_bytes(resp.content)
+            log.info("  image saved: %s", filename)
+            updates.append({"rowIndex": card["_rowIndex"], "imageUrl": gh_url})
+        except Exception as e:
+            log.warning("  image download failed (%s): %s", filename, e)
+
+    return updates
+
+
 def search_for_url(card_name, set_name, session):
     """Search PriceCharting for a card and return its product URL."""
     query = f"{card_name} {set_name}".strip()
@@ -387,7 +443,30 @@ def scrape_all():
         log.info("Inventory is empty.")
         sys.exit(0)
 
-    log.info("Found %d cards.\n", len(inventory))
+    log.info("Found %d cards.", len(inventory))
+
+    # Filter to a single card if CARD_NAME is set
+    if CARD_NAME:
+        inventory = [c for c in inventory if c.get("Card Name", "").strip().lower() == CARD_NAME.lower()]
+        if not inventory:
+            log.error("No card found matching CARD_NAME=%r", CARD_NAME)
+            sys.exit(1)
+        log.info("Filtered to %d card(s) matching %r.", len(inventory), CARD_NAME)
+
+    log.info("")
+
+    # Download card images and update sheet Image URL column
+    log.info("Downloading card images…")
+    image_updates = download_images(inventory, session)
+    if image_updates:
+        log.info("Updating %d image URL(s)…", len(image_updates))
+        try:
+            res = api_post(session, "updateImageUrls", {"data": image_updates})
+            log.info("  %s", res.get("message", "ok"))
+        except Exception as e:
+            log.error("  Image URL update failed: %s", e)
+
+    log.info("")
 
     price_updates = []
     total_value   = 0.0

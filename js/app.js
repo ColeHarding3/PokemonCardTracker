@@ -950,6 +950,45 @@ function saveScriptUrl() {
 })();
 
 // ============================================================
+// GITHUB ACTIONS — MANUAL REFRESH
+// ============================================================
+
+async function triggerScrape(cardName = null) {
+  if (!CONFIG.GITHUB_TOKEN) {
+    showToast("Add your GitHub PAT to CONFIG.GITHUB_TOKEN in js/config.js to enable manual refresh.", "error");
+    return;
+  }
+
+  const url = `https://api.github.com/repos/${CONFIG.GITHUB_OWNER}/${CONFIG.GITHUB_REPO}/actions/workflows/scrape.yml/dispatches`;
+  const inputs = cardName ? { card_name: cardName } : {};
+
+  const label = cardName ? `"${cardName}"` : "all cards";
+  showToast(`Triggering price refresh for ${label}…`);
+
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${CONFIG.GITHUB_TOKEN}`,
+        Accept: "application/vnd.github+json",
+        "Content-Type": "application/json",
+        "X-GitHub-Api-Version": "2022-11-28",
+      },
+      body: JSON.stringify({ ref: "main", inputs }),
+    });
+
+    if (res.status === 204) {
+      showToast(`Refresh started for ${label}. Check GitHub Actions for progress.`);
+    } else {
+      const json = await res.json().catch(() => ({}));
+      showToast(`GitHub API error ${res.status}: ${json.message || "Unknown error"}`, "error");
+    }
+  } catch (err) {
+    showToast(`Failed to trigger refresh: ${err.message}`, "error");
+  }
+}
+
+// ============================================================
 // EVENT LISTENERS
 // ============================================================
 
@@ -1040,6 +1079,19 @@ function setupEventListeners() {
   // Chart mode toggle button
   const chartModeBtn = document.getElementById("chart-mode-btn");
   if (chartModeBtn) chartModeBtn.addEventListener("click", toggleChartMode);
+
+  // Refresh All Prices button
+  const refreshAllBtn = document.getElementById("refresh-all-btn");
+  if (refreshAllBtn) refreshAllBtn.addEventListener("click", () => triggerScrape());
+
+  // Refresh This Card button (inside detail modal)
+  const refreshCardBtn = document.getElementById("refresh-card-btn");
+  if (refreshCardBtn) {
+    refreshCardBtn.addEventListener("click", () => {
+      const cardName = state.detailCard && state.detailCard["Card Name"];
+      if (cardName) triggerScrape(cardName);
+    });
+  }
 }
 
 // ============================================================

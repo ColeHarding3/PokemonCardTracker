@@ -5,8 +5,16 @@ on:
   schedule:
     - cron: "0 0 * * 0"
 
-  # Allow manual trigger from the GitHub Actions tab
+  # Allow manual trigger from the GitHub Actions tab or via API
   workflow_dispatch:
+    inputs:
+      card_name:
+        description: "Card name to scrape (leave blank to scrape all)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
 
 jobs:
   scrape:
@@ -30,4 +38,17 @@ jobs:
       - name: Run price scraper
         env:
           APPS_SCRIPT_URL: ${{ secrets.APPS_SCRIPT_URL }}
+          CARD_NAME: ${{ inputs.card_name }}
         run: python scraper/scraper.py
+
+      - name: Commit and push new card images
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add images/cards/
+          if git diff --cached --quiet; then
+            echo "No new images to commit."
+          else
+            git commit -m "chore: add card images from price scraper run"
+            git push
+          fi

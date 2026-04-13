@@ -13,6 +13,13 @@ const CONFIG = {
   // Refresh interval in milliseconds (5 minutes default)
   REFRESH_INTERVAL: 5 * 60 * 1000,
 
+  // GitHub Personal Access Token for triggering Actions workflows.
+  // Generate one at: GitHub → Settings → Developer settings → Personal access tokens
+  // Requires "workflow" scope. Leave empty to disable manual refresh buttons.
+  GITHUB_TOKEN: "",
+  GITHUB_OWNER: "Coleharding3",
+  GITHUB_REPO:  "pokemoncardtracker",
+
   // Chart.js default color palette
   CHART_COLORS: {
     primary: "#e8b923",

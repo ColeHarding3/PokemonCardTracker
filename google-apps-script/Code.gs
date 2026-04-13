@@ -257,6 +257,8 @@ function doPost(e) {
         return jsonResponse(updateCardPriceHistory(body));
       case "updatePsaPopulation":
         return jsonResponse(updatePsaPopulation(body));
+      case "updateImageUrls":
+        return jsonResponse(updateImageUrls(body.data));
       default:
         return jsonResponse({ status: "error", message: "Unknown action: " + action });
     }
@@ -554,6 +556,28 @@ function updatePsaPopulation(body) {
   // New row
   sheet.appendRow([cardName, set, cardNumber, psa9Pop, psa10Pop, timestamp]);
   return { status: "success", message: "PSA population added" };
+}
+
+// ============================================================
+// IMAGE URL UPDATE
+// ============================================================
+
+function updateImageUrls(updates) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName("Inventory");
+  if (!sheet) return { status: "error", message: "Inventory sheet not found." };
+
+  if (!updates || !updates.length) return { status: "success", message: "No updates" };
+
+  var count = 0;
+  for (var i = 0; i < updates.length; i++) {
+    var rowIndex = parseInt(updates[i].rowIndex);
+    var imageUrl = updates[i].imageUrl || "";
+    if (!rowIndex || rowIndex < 2) continue;
+    sheet.getRange(rowIndex, 16).setValue(imageUrl); // col 16 = Image URL
+    count++;
+  }
+  return { status: "success", message: "Updated " + count + " image URL(s)" };
 }
 
 function getPsaPopulationData() {

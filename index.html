@@ -46,6 +46,7 @@
     </div>
     <div class="header-actions">
       <span class="last-updated-tag" id="last-updated">Loading…</span>
+      <button class="btn btn-ghost" id="refresh-all-btn" title="Trigger GitHub Actions price scrape for all cards">↻ Refresh Prices</button>
       <button class="btn btn-primary" onclick="openAddModal()">+ Add Card</button>
     </div>
   </header>
@@ -477,6 +478,7 @@
 
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeDetailModal()">Close</button>
+      <button class="btn btn-ghost" id="refresh-card-btn" title="Trigger GitHub Actions price scrape for this card">↻ Refresh This Card</button>
       <button class="btn btn-primary" id="detail-edit-btn" onclick="closeDetailAndEdit()">Edit Card</button>
     </div>
 
