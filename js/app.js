@@ -66,6 +66,20 @@ function showError(msg) {
   }
 }
 
+function escHtml(str) {
+  const div = document.createElement("div");
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function updateLastUpdated() {
+  const el = document.getElementById("last-updated");
+  if (el) el.textContent = "Loading…";
+  // Show current time
+  const now = new Date();
+  if (el) el.textContent = now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+}
+
 let state = {
   // Dashboard data
   dashboard: null,
