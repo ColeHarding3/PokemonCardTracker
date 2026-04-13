@@ -16,9 +16,9 @@ function setupSheet() {
     inv.appendRow([
       "Row", "Card Name", "Set", "Card Number", "Condition", "Quantity",
       "Graded", "PSA Grade", "Purchase Price", "Current Price", "Total Value",
-      "PriceCharting URL", "Date Added", "Notes"
+      "PriceCharting URL", "Date Added", "Notes", "Image URL"
     ]);
-    inv.getRange(1, 1, 1, 14).setFontWeight("bold").setBackground("#1a1a2e").setFontColor("#ffffff");
+    inv.getRange(1, 1, 1, 15).setFontWeight("bold").setBackground("#1a1a2e").setFontColor("#ffffff");
     inv.setFrozenRows(1);
   }
 
@@ -266,7 +266,8 @@ function addCard(data) {
     totalValue,
     data.priceChartingUrl || "",
     dateStr,
-    data.notes || ""
+    data.notes || "",
+    data.imageUrl || ""
   ];
 
   sheet.appendRow(row);
@@ -297,7 +298,8 @@ function updateCard(rowIndex, data) {
     totalValue,
     data.priceChartingUrl || "",
     data.dateAdded || "",
-    data.notes || ""
+    data.notes || "",
+    data.imageUrl || ""
   ];
 
   sheet.getRange(ri, 1, 1, row.length).setValues([row]);

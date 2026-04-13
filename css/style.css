@@ -808,6 +808,266 @@ tbody td {
   .brand-name { display: none; }
 }
 
+/* ============================================================ SEARCH MODAL */
+
+.modal-box-wide {
+  max-width: 860px;
+}
+
+.search-modal-bar {
+  position: relative;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.search-modal-icon {
+  position: absolute;
+  left: 34px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 16px;
+  pointer-events: none;
+  opacity: 0.5;
+}
+
+.search-modal-bar input {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: 15px;
+  outline: none;
+  padding: 12px 16px 12px 44px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  width: 100%;
+}
+
+.search-modal-bar input:focus {
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 3px rgba(232,185,35,0.08);
+}
+
+.search-modal-bar input::placeholder { color: var(--text-muted); }
+
+#search-results-area {
+  max-height: 480px;
+  overflow-y: auto;
+  min-height: 200px;
+}
+
+.search-state {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 200px;
+  padding: 32px 24px;
+  text-align: center;
+}
+
+.search-hint-icon {
+  font-size: 40px;
+  margin-bottom: 12px;
+  opacity: 0.6;
+}
+
+.search-hint-text {
+  color: var(--text-secondary);
+  font-size: 15px;
+  font-weight: 500;
+  margin-bottom: 6px;
+}
+
+.search-hint-sub {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+/* ============================================================ CARD RESULTS GRID */
+
+.card-results-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  padding: 16px;
+}
+
+.tcg-card-result {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  overflow: hidden;
+  transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+
+.tcg-card-result:hover {
+  border-color: var(--border-focus);
+  box-shadow: 0 4px 20px rgba(232,185,35,0.15);
+  transform: translateY(-3px);
+}
+
+.tcg-card-img-wrap {
+  aspect-ratio: 63 / 88;
+  background: var(--bg-base);
+  overflow: hidden;
+  position: relative;
+  width: 100%;
+}
+
+.tcg-card-img-wrap img {
+  display: block;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.2s;
+  width: 100%;
+}
+
+.tcg-card-result:hover .tcg-card-img-wrap img {
+  transform: scale(1.04);
+}
+
+.tcg-card-no-img {
+  align-items: center;
+  background: var(--bg-surface);
+  color: var(--text-muted);
+  display: flex;
+  font-size: 28px;
+  height: 100%;
+  justify-content: center;
+  width: 100%;
+}
+
+.tcg-card-info {
+  padding: 8px 10px 10px;
+}
+
+.tcg-card-name {
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.3;
+  margin-bottom: 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tcg-card-set {
+  color: var(--text-muted);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-bottom: 4px;
+}
+
+.tcg-card-price {
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.price-variant {
+  background: rgba(232,185,35,0.1);
+  border-radius: 3px;
+  color: var(--text-muted);
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 500;
+  padding: 1px 5px;
+}
+
+/* ============================================================ SELECTED CARD BANNER */
+
+.selected-card-banner {
+  align-items: center;
+  background: linear-gradient(135deg, rgba(232,185,35,0.06) 0%, rgba(232,185,35,0.02) 100%);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  gap: 16px;
+  padding: 16px 20px;
+}
+
+.preview-card-img {
+  border-radius: 6px;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.4);
+  flex-shrink: 0;
+  height: 80px;
+  object-fit: contain;
+  width: 57px;
+}
+
+.preview-card-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.preview-card-name {
+  color: var(--text-primary);
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.preview-card-meta {
+  color: var(--text-muted);
+  font-size: 12px;
+  margin-bottom: 5px;
+}
+
+.preview-card-price {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.preview-card-price strong {
+  color: var(--accent);
+  font-family: var(--font-mono);
+}
+
+.btn-sm {
+  font-size: 12px;
+  padding: 6px 12px;
+}
+
+/* ============================================================ CARD THUMBNAIL IN TABLE */
+
+.card-name-cell {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+}
+
+.card-thumb {
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+  flex-shrink: 0;
+  height: 48px;
+  object-fit: contain;
+  width: 34px;
+}
+
+.card-thumb-placeholder {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  flex-shrink: 0;
+  height: 48px;
+  width: 34px;
+}
+
+.card-name-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
 /* ============================================================ TICKER BAR */
 .ticker-bar {
   background: var(--bg-surface);

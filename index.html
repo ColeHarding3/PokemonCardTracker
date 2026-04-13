@@ -196,91 +196,168 @@
 
 <!-- ============================================================ ADD/EDIT MODAL -->
 <div id="card-modal" class="modal-overlay">
-  <div class="modal-box">
+  <div class="modal-box modal-box-wide">
+
     <div class="modal-header">
       <h2 id="modal-title">Add Card</h2>
       <button class="modal-close" onclick="closeModal()">✕</button>
     </div>
-    <div class="modal-body">
-      <form id="card-form" autocomplete="off">
-        <div class="form-grid">
 
-          <div class="form-group span-2">
-            <label for="field-name">Card Name *</label>
-            <input id="field-name" type="text" placeholder="e.g. Charizard" required />
-          </div>
+    <!-- ── STEP 1: SEARCH VIEW ── -->
+    <div id="modal-search-view">
+      <div class="search-modal-bar">
+        <span class="search-modal-icon">🔍</span>
+        <input
+          id="tcg-search-input"
+          type="text"
+          placeholder="Search the Pokemon TCG database… e.g. Charizard, Umbreon VMAX"
+          autocomplete="off"
+        />
+      </div>
 
-          <div class="form-group">
-            <label for="field-set">Set</label>
-            <input id="field-set" type="text" placeholder="e.g. Base Set" />
-          </div>
-
-          <div class="form-group">
-            <label for="field-number">Card Number</label>
-            <input id="field-number" type="text" placeholder="e.g. 4/102" />
-          </div>
-
-          <div class="form-group">
-            <label for="field-condition">Condition</label>
-            <select id="field-condition">
-              <option value="Mint">Mint</option>
-              <option value="NM" selected>Near Mint (NM)</option>
-              <option value="LP">Lightly Played (LP)</option>
-              <option value="MP">Moderately Played (MP)</option>
-              <option value="HP">Heavily Played (HP)</option>
-              <option value="Damaged">Damaged</option>
-            </select>
-          </div>
-
-          <div class="form-group">
-            <label for="field-qty">Quantity</label>
-            <input id="field-qty" type="number" min="1" value="1" />
-          </div>
-
-          <div class="form-group">
-            <label>Graded Card?</label>
-            <div class="checkbox-group">
-              <input id="field-graded" type="checkbox" />
-              <label for="field-graded">This card is professionally graded</label>
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label for="field-psa">PSA Grade</label>
-            <input id="field-psa" type="number" min="1" max="10" placeholder="1–10" />
-          </div>
-
-          <div class="form-group">
-            <label for="field-purchase-price">Purchase Price ($)</label>
-            <input id="field-purchase-price" type="number" min="0" step="0.01" placeholder="0.00" />
-          </div>
-
-          <div class="form-group">
-            <label for="field-current-price">Current Price ($)</label>
-            <input id="field-current-price" type="number" min="0" step="0.01" placeholder="0.00" />
-          </div>
-
-          <div class="form-group span-2">
-            <label for="field-url">PriceCharting URL</label>
-            <input id="field-url" type="url" placeholder="https://www.pricecharting.com/game/…" />
-          </div>
-
-          <div class="form-group span-2">
-            <label for="field-notes">Notes</label>
-            <textarea id="field-notes" placeholder="Any extra details…"></textarea>
-          </div>
-
-          <!-- Hidden: date added (populated on edit) -->
-          <input id="field-date-added" type="hidden" />
-
+      <div id="search-results-area">
+        <!-- idle -->
+        <div id="search-idle-state" class="search-state" style="display:flex">
+          <div class="search-hint-icon">⚡</div>
+          <p class="search-hint-text">Type a card name to search the Pokemon TCG database</p>
+          <p class="search-hint-sub">Prices are pulled from TCGPlayer market data</p>
         </div>
-      </form>
+        <!-- loading -->
+        <div id="search-loading-state" class="search-state" style="display:none">
+          <div class="loader-spinner"></div>
+          <p class="search-hint-sub" style="margin-top:12px">Searching…</p>
+        </div>
+        <!-- results grid -->
+        <div id="search-results-grid" class="card-results-grid" style="display:none"></div>
+        <!-- empty -->
+        <div id="search-empty-state" class="search-state" style="display:none">
+          <div class="search-hint-icon" style="opacity:0.3">🃏</div>
+          <p class="search-hint-text">No cards found</p>
+          <p class="search-hint-sub">Try a different name or check your spelling</p>
+        </div>
+        <!-- error -->
+        <div id="search-error-state" class="search-state" style="display:none">
+          <div class="search-hint-icon" style="opacity:0.4">⚠️</div>
+          <p class="search-hint-text">Search failed</p>
+          <p class="search-hint-sub" id="search-error-msg"></p>
+        </div>
+      </div>
     </div>
-    <div class="modal-footer">
-      <button class="btn btn-ghost" type="button" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-primary" id="form-submit-btn" type="submit" form="card-form">Save Card</button>
-    </div>
-  </div>
+
+    <!-- ── STEP 2: ADD / EDIT FORM VIEW ── -->
+    <div id="modal-form-view" style="display:none">
+
+      <!-- Selected card preview banner (add mode only) -->
+      <div id="selected-card-preview" class="selected-card-banner">
+        <img id="preview-card-img" src="" alt="" class="preview-card-img" />
+        <div class="preview-card-info">
+          <div class="preview-card-name" id="preview-card-name"></div>
+          <div class="preview-card-meta" id="preview-card-meta"></div>
+          <div class="preview-card-price" id="preview-card-price"></div>
+        </div>
+        <button
+          id="back-to-search-btn"
+          class="btn btn-ghost btn-sm"
+          type="button"
+          onclick="backToSearch()"
+        >← Change</button>
+      </div>
+
+      <div class="modal-body">
+        <form id="card-form" autocomplete="off">
+          <div class="form-grid">
+
+            <!-- Card identity fields — shown in edit mode only -->
+            <div class="form-group span-2 form-add-hidden" style="display:none">
+              <label for="field-name">Card Name *</label>
+              <input id="field-name" type="text" placeholder="e.g. Charizard" />
+            </div>
+
+            <div class="form-add-hidden" style="display:none">
+              <div class="form-group">
+                <label for="field-set">Set</label>
+                <input id="field-set" type="text" placeholder="e.g. Base Set" />
+              </div>
+            </div>
+
+            <div class="form-add-hidden" style="display:none">
+              <div class="form-group">
+                <label for="field-number">Card Number</label>
+                <input id="field-number" type="text" placeholder="e.g. 4/102" />
+              </div>
+            </div>
+
+            <!-- Edit-only: image URL field -->
+            <div class="form-group span-2 form-edit-only" style="display:none">
+              <label for="field-image-url">Card Image URL</label>
+              <input id="field-image-url" type="url" placeholder="https://images.pokemontcg.io/…" />
+            </div>
+
+            <!-- Always-shown fields -->
+            <div class="form-group">
+              <label for="field-condition">Condition</label>
+              <select id="field-condition">
+                <option value="Mint">Mint</option>
+                <option value="NM" selected>Near Mint (NM)</option>
+                <option value="LP">Lightly Played (LP)</option>
+                <option value="MP">Moderately Played (MP)</option>
+                <option value="HP">Heavily Played (HP)</option>
+                <option value="Damaged">Damaged</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="field-qty">Quantity</label>
+              <input id="field-qty" type="number" min="1" value="1" />
+            </div>
+
+            <div class="form-group">
+              <label>Graded Card?</label>
+              <div class="checkbox-group">
+                <input id="field-graded" type="checkbox" />
+                <label for="field-graded">Professionally graded</label>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="field-psa">PSA Grade</label>
+              <input id="field-psa" type="number" min="1" max="10" placeholder="1–10" />
+            </div>
+
+            <div class="form-group">
+              <label for="field-purchase-price">Purchase Price ($)</label>
+              <input id="field-purchase-price" type="number" min="0" step="0.01" placeholder="0.00" />
+            </div>
+
+            <div class="form-group">
+              <label for="field-current-price">Current Price ($)</label>
+              <input id="field-current-price" type="number" min="0" step="0.01" placeholder="0.00" />
+            </div>
+
+            <div class="form-group span-2">
+              <label for="field-url">PriceCharting URL <span style="font-weight:400;text-transform:none;letter-spacing:0">(optional)</span></label>
+              <input id="field-url" type="url" placeholder="https://www.pricecharting.com/game/…" />
+            </div>
+
+            <div class="form-group span-2">
+              <label for="field-notes">Notes</label>
+              <textarea id="field-notes" placeholder="Any extra details…"></textarea>
+            </div>
+
+            <input id="field-date-added" type="hidden" />
+
+          </div>
+        </form>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-ghost" type="button" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-primary" id="form-submit-btn" type="submit" form="card-form">Save Card</button>
+      </div>
+
+    </div><!-- /modal-form-view -->
+
+  </div><!-- /modal-box -->
 </div>
 
 <!-- ============================================================ CONFIRM DIALOG -->

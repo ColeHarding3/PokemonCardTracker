@@ -2,6 +2,8 @@
 // Pokemon Card Portfolio Tracker — Main Application
 // ============================================================
 
+const TCG_API = "https://api.pokemontcg.io/v2/cards";
+
 let state = {
   dashboard: null,
   inventory: [],
@@ -12,6 +14,10 @@ let state = {
   editingRowIndex: null,
   chartInstance: null,
   chartRange: "ALL",
+  // TCG search
+  tcgResults: [],
+  selectedTcgCard: null,
+  searchDebounceTimer: null,
 };
 
 // ============================================================
@@ -33,7 +39,7 @@ function initApp() {
 }
 
 // ============================================================
-// API CALLS
+// APPS SCRIPT API
 // ============================================================
 
 async function apiFetch(action, params = {}) {
@@ -46,14 +52,198 @@ async function apiFetch(action, params = {}) {
 }
 
 async function apiPost(action, data) {
-  const res = await fetch(CONFIG.APPS_SCRIPT_URL, {
+  await fetch(CONFIG.APPS_SCRIPT_URL, {
     method: "POST",
     headers: { "Content-Type": "text/plain" },
     body: JSON.stringify({ action, ...data }),
     mode: "no-cors",
   });
-  // no-cors means we can't read the response, so optimistically return success
   return { status: "success" };
+}
+
+// ============================================================
+// POKEMON TCG API
+// ============================================================
+
+async function searchTCGCards(query) {
+  if (!query || query.trim().length < 2) {
+    setSearchState("idle");
+    return;
+  }
+  setSearchState("loading");
+  try {
+    // Wrap in quotes for exact-name matching, fall back to prefix
+    const q = encodeURIComponent(`name:"${query.trim()}"`);
+    const res = await fetch(`${TCG_API}?q=${q}&pageSize=20&orderBy=-set.releaseDate`);
+    if (!res.ok) throw new Error(`TCG API HTTP ${res.status}`);
+    const json = await res.json();
+    state.tcgResults = json.data || [];
+
+    // If exact-name returns nothing, try prefix search
+    if (state.tcgResults.length === 0) {
+      const q2 = encodeURIComponent(`name:${query.trim()}*`);
+      const res2 = await fetch(`${TCG_API}?q=${q2}&pageSize=20&orderBy=-set.releaseDate`);
+      const json2 = await res2.json();
+      state.tcgResults = json2.data || [];
+    }
+
+    if (state.tcgResults.length === 0) {
+      setSearchState("empty");
+    } else {
+      renderTCGResults();
+      setSearchState("results");
+    }
+  } catch (err) {
+    setSearchState("error", err.message);
+  }
+}
+
+function getHighestMarketPrice(card) {
+  const prices = card.tcgplayer && card.tcgplayer.prices;
+  if (!prices) return null;
+  let highest = null;
+  let highestVariant = null;
+  for (const [variant, data] of Object.entries(prices)) {
+    const market = data && data.market;
+    if (market != null && (highest === null || market > highest)) {
+      highest = market;
+      highestVariant = variant;
+    }
+  }
+  return highest !== null ? { price: highest, variant: highestVariant } : null;
+}
+
+function formatVariantLabel(variant) {
+  return variant
+    .replace(/([A-Z])/g, " $1")
+    .replace(/^./, (s) => s.toUpperCase())
+    .trim();
+}
+
+function renderTCGResults() {
+  const grid = document.getElementById("search-results-grid");
+  if (!grid) return;
+  grid.innerHTML = state.tcgResults
+    .map((card) => {
+      const priceInfo = getHighestMarketPrice(card);
+      const priceStr = priceInfo ? formatCurrency(priceInfo.price) : "No price";
+      const variantStr = priceInfo ? ` <span class="price-variant">${formatVariantLabel(priceInfo.variant)}</span>` : "";
+      const imgSrc = card.images && card.images.small ? card.images.small : "";
+      return `
+        <div class="tcg-card-result" onclick="selectTCGCard('${escHtml(card.id)}')">
+          <div class="tcg-card-img-wrap">
+            ${imgSrc
+              ? `<img src="${escHtml(imgSrc)}" alt="${escHtml(card.name)}" loading="lazy" />`
+              : `<div class="tcg-card-no-img">?</div>`}
+          </div>
+          <div class="tcg-card-info">
+            <div class="tcg-card-name">${escHtml(card.name)}</div>
+            <div class="tcg-card-set">${escHtml(card.set ? card.set.name : "")} · #${escHtml(card.number || "")}</div>
+            <div class="tcg-card-price">${priceStr}${variantStr}</div>
+          </div>
+        </div>`;
+    })
+    .join("");
+}
+
+function selectTCGCard(cardId) {
+  const card = state.tcgResults.find((c) => c.id === cardId);
+  if (!card) return;
+  state.selectedTcgCard = card;
+
+  // Populate the preview banner
+  const imgEl = document.getElementById("preview-card-img");
+  if (imgEl) {
+    imgEl.src = (card.images && card.images.small) || "";
+    imgEl.style.display = card.images && card.images.small ? "block" : "none";
+  }
+  setText("preview-card-name", card.name);
+  setText(
+    "preview-card-meta",
+    `${card.set ? card.set.name : ""} · #${card.number || ""}`
+  );
+
+  const priceInfo = getHighestMarketPrice(card);
+  const priceEl = document.getElementById("preview-card-price");
+  if (priceEl) {
+    if (priceInfo) {
+      priceEl.innerHTML = `Market: <strong>${formatCurrency(priceInfo.price)}</strong> <span class="price-variant">${formatVariantLabel(priceInfo.variant)}</span>`;
+      // Pre-fill purchase price with market price
+      const ppEl = document.getElementById("field-purchase-price");
+      if (ppEl && !ppEl.value) ppEl.value = priceInfo.price.toFixed(2);
+      // Also set current price
+      const cpEl = document.getElementById("field-current-price");
+      if (cpEl) cpEl.value = priceInfo.price.toFixed(2);
+    } else {
+      priceEl.textContent = "No TCGPlayer price available";
+    }
+  }
+
+  // Switch from search view to form view
+  showModalView("form");
+  document.getElementById("modal-title").textContent = "Add to Collection";
+  // Show back button, hide edit-only fields
+  const backBtn = document.getElementById("back-to-search-btn");
+  if (backBtn) backBtn.style.display = "flex";
+  setCardFormReadOnly(false); // add mode: hide name/set/number fields (shown in banner)
+}
+
+function backToSearch() {
+  state.selectedTcgCard = null;
+  showModalView("search");
+  document.getElementById("modal-title").textContent = "Add Card";
+}
+
+function showModalView(view) {
+  const searchView = document.getElementById("modal-search-view");
+  const formView = document.getElementById("modal-form-view");
+  const modalBox = document.querySelector(".modal-box");
+  if (view === "search") {
+    searchView.style.display = "block";
+    formView.style.display = "none";
+    modalBox.classList.add("modal-box-wide");
+  } else {
+    searchView.style.display = "none";
+    formView.style.display = "block";
+    modalBox.classList.remove("modal-box-wide");
+  }
+}
+
+function setSearchState(state, errorMsg) {
+  const states = ["idle", "loading", "results", "empty", "error"];
+  states.forEach((s) => {
+    const el = document.getElementById(`search-${s}-state`);
+    if (el) el.style.display = "none";
+  });
+  const grid = document.getElementById("search-results-grid");
+  if (grid) grid.style.display = "none";
+
+  if (state === "results") {
+    const grid = document.getElementById("search-results-grid");
+    if (grid) grid.style.display = "grid";
+  } else {
+    const el = document.getElementById(`search-${state}-state`);
+    if (el) el.style.display = "flex";
+    if (state === "error" && errorMsg) {
+      const errEl = document.getElementById("search-error-msg");
+      if (errEl) errEl.textContent = errorMsg;
+    }
+  }
+}
+
+// setCardFormReadOnly: in "add" mode, card identity fields are hidden (shown in banner)
+// in "edit" mode, all fields are shown
+function setCardFormReadOnly(isEdit) {
+  const addOnlyFields = document.querySelectorAll(".form-add-hidden");
+  const editOnlyFields = document.querySelectorAll(".form-edit-only");
+  const banner = document.getElementById("selected-card-preview");
+  addOnlyFields.forEach((el) => {
+    el.style.display = isEdit ? "flex" : "none";
+  });
+  editOnlyFields.forEach((el) => {
+    el.style.display = isEdit ? "flex" : "none";
+  });
+  if (banner) banner.style.display = isEdit ? "none" : "flex";
 }
 
 // ============================================================
@@ -126,7 +316,6 @@ function renderTopStats() {
   const d = state.dashboard;
   if (!d || !state.inventory.length) return;
 
-  // Most valuable card
   const sorted = [...state.inventory].sort(
     (a, b) => (parseFloat(b["Current Price"]) || 0) - (parseFloat(a["Current Price"]) || 0)
   );
@@ -134,17 +323,12 @@ function renderTopStats() {
   setText("top-card-name", topCard ? topCard["Card Name"] : "—");
   setText("top-card-value", topCard ? formatCurrency(parseFloat(topCard["Current Price"]) || 0) : "—");
 
-  // Average value
-  const avg = state.inventory.length
-    ? d.totalValue / state.inventory.length
-    : 0;
+  const avg = state.inventory.length ? d.totalValue / state.inventory.length : 0;
   setText("avg-card-value", formatCurrency(avg));
 
-  // Invested vs current
   setText("total-invested", formatCurrency(d.totalInvested || 0));
   setText("total-current", formatCurrency(d.totalValue || 0));
 
-  // Best performer (highest gain %)
   const performers = state.inventory
     .map((c) => {
       const cur = parseFloat(c["Current Price"]) || 0;
@@ -170,7 +354,6 @@ function renderTable() {
 
   let rows = [...state.inventory];
 
-  // Filter
   if (state.searchQuery) {
     const q = state.searchQuery.toLowerCase();
     rows = rows.filter(
@@ -181,11 +364,9 @@ function renderTable() {
     );
   }
 
-  // Sort
   rows.sort((a, b) => {
     let av = a[state.sortColumn] || "";
     let bv = b[state.sortColumn] || "";
-    // Try numeric
     const an = parseFloat(av);
     const bn = parseFloat(bv);
     if (!isNaN(an) && !isNaN(bn)) {
@@ -199,8 +380,14 @@ function renderTable() {
     return 0;
   });
 
+  // Update count
+  const countEl = document.getElementById("table-count");
+  if (countEl) countEl.textContent = rows.length === state.inventory.length
+    ? `${rows.length} cards`
+    : `${rows.length} of ${state.inventory.length}`;
+
   if (rows.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="9" class="empty-state">
+    tbody.innerHTML = `<tr><td colspan="8" class="empty-state">
       ${state.searchQuery ? "No cards match your search." : 'No cards yet. Click <strong>+ Add Card</strong> to get started.'}
     </td></tr>`;
     return;
@@ -216,13 +403,19 @@ function renderTable() {
       const changePct = buy > 0 ? ((cur - buy) / buy) * 100 : 0;
       const changeClass = change >= 0 ? "positive" : "negative";
       const graded = card["Graded"] === "Yes";
+      const imgUrl = card["Image URL"] || "";
 
       return `
       <tr data-row="${card._rowIndex}" class="table-row">
         <td>
           <div class="card-name-cell">
-            <span class="card-name">${escHtml(card["Card Name"] || "")}</span>
-            ${graded ? `<span class="badge-grade">PSA ${escHtml(String(card["PSA Grade"] || ""))}</span>` : ""}
+            ${imgUrl
+              ? `<img src="${escHtml(imgUrl)}" alt="${escHtml(card["Card Name"] || "")}" class="card-thumb" loading="lazy" />`
+              : `<div class="card-thumb-placeholder"></div>`}
+            <div class="card-name-info">
+              <span class="card-name">${escHtml(card["Card Name"] || "")}</span>
+              ${graded ? `<span class="badge-grade">PSA ${escHtml(String(card["PSA Grade"] || ""))}</span>` : ""}
+            </div>
           </div>
         </td>
         <td>${escHtml(card["Set"] || "")}</td>
@@ -252,7 +445,6 @@ function renderChart() {
 
   let snapshots = [...state.snapshots];
 
-  // Filter by range
   const now = new Date();
   const rangeDays = {
     "1W": 7, "1M": 30, "3M": 90, "6M": 180, "1Y": 365, "ALL": Infinity,
@@ -266,7 +458,6 @@ function renderChart() {
   const labels = snapshots.map((s) => s["Date"]);
   const values = snapshots.map((s) => parseFloat(s["Total Portfolio Value"]) || 0);
 
-  // Add current value if not already there
   if (state.dashboard && state.dashboard.totalValue) {
     const today = new Date().toISOString().slice(0, 10);
     if (!labels.includes(today)) {
@@ -293,19 +484,17 @@ function renderChart() {
     type: "line",
     data: {
       labels,
-      datasets: [
-        {
-          label: "Portfolio Value",
-          data: values,
-          borderColor: lineColor,
-          backgroundColor: lineColor + "22",
-          borderWidth: 2.5,
-          pointRadius: labels.length > 30 ? 0 : 3,
-          pointHoverRadius: 5,
-          fill: true,
-          tension: 0.3,
-        },
-      ],
+      datasets: [{
+        label: "Portfolio Value",
+        data: values,
+        borderColor: lineColor,
+        backgroundColor: lineColor + "22",
+        borderWidth: 2.5,
+        pointRadius: labels.length > 30 ? 0 : 3,
+        pointHoverRadius: 5,
+        fill: true,
+        tension: 0.3,
+      }],
     },
     options: {
       responsive: true,
@@ -319,9 +508,7 @@ function renderChart() {
           borderWidth: 1,
           titleColor: "#aaa",
           bodyColor: "#fff",
-          callbacks: {
-            label: (ctx) => " " + formatCurrency(ctx.parsed.y),
-          },
+          callbacks: { label: (ctx) => " " + formatCurrency(ctx.parsed.y) },
         },
       },
       scales: {
@@ -331,10 +518,7 @@ function renderChart() {
         },
         y: {
           grid: { color: CONFIG.CHART_COLORS.gridLine },
-          ticks: {
-            color: "#888",
-            callback: (v) => formatCurrency(v),
-          },
+          ticks: { color: "#888", callback: (v) => formatCurrency(v) },
         },
       },
     },
@@ -342,20 +526,38 @@ function renderChart() {
 }
 
 // ============================================================
-// MODAL — ADD / EDIT CARD
+// MODAL — ADD (search-to-add) / EDIT
 // ============================================================
 
 function openAddModal() {
   state.editingRowIndex = null;
+  state.selectedTcgCard = null;
+  state.tcgResults = [];
+
   document.getElementById("modal-title").textContent = "Add Card";
   document.getElementById("card-form").reset();
+
+  // Reset search
+  const input = document.getElementById("tcg-search-input");
+  if (input) input.value = "";
+  setSearchState("idle");
+
+  showModalView("search");
   document.getElementById("card-modal").classList.add("open");
+
+  // Focus the search input after transition
+  setTimeout(() => {
+    const input = document.getElementById("tcg-search-input");
+    if (input) input.focus();
+  }, 50);
 }
 
 function openEditModal(rowIndex) {
   const card = state.inventory.find((c) => c._rowIndex === rowIndex);
   if (!card) return;
   state.editingRowIndex = rowIndex;
+  state.selectedTcgCard = null;
+
   document.getElementById("modal-title").textContent = "Edit Card";
 
   fillFormField("field-name", card["Card Name"]);
@@ -368,8 +570,14 @@ function openEditModal(rowIndex) {
   fillFormField("field-purchase-price", card["Purchase Price"]);
   fillFormField("field-current-price", card["Current Price"]);
   fillFormField("field-url", card["PriceCharting URL"]);
+  fillFormField("field-image-url", card["Image URL"]);
   fillFormField("field-notes", card["Notes"]);
   document.getElementById("field-date-added").value = card["Date Added"] || "";
+
+  showModalView("form");
+  setCardFormReadOnly(true); // edit mode: show all fields
+  const backBtn = document.getElementById("back-to-search-btn");
+  if (backBtn) backBtn.style.display = "none";
 
   document.getElementById("card-modal").classList.add("open");
 }
@@ -377,6 +585,7 @@ function openEditModal(rowIndex) {
 function closeModal() {
   document.getElementById("card-modal").classList.remove("open");
   state.editingRowIndex = null;
+  state.selectedTcgCard = null;
 }
 
 async function submitCardForm(e) {
@@ -385,10 +594,29 @@ async function submitCardForm(e) {
   btn.disabled = true;
   btn.textContent = "Saving…";
 
+  // Determine image URL: from selected TCG card (add mode) or from form field (edit mode)
+  let imageUrl = "";
+  if (state.selectedTcgCard) {
+    imageUrl = (state.selectedTcgCard.images && state.selectedTcgCard.images.small) || "";
+  } else {
+    imageUrl = getFormVal("field-image-url");
+  }
+
+  // Card identity: from TCG card (add mode) or from form fields (edit mode)
+  const cardName = state.selectedTcgCard
+    ? state.selectedTcgCard.name
+    : getFormVal("field-name");
+  const cardSet = state.selectedTcgCard
+    ? (state.selectedTcgCard.set ? state.selectedTcgCard.set.name : "")
+    : getFormVal("field-set");
+  const cardNumber = state.selectedTcgCard
+    ? (state.selectedTcgCard.number || "")
+    : getFormVal("field-number");
+
   const data = {
-    cardName: getFormVal("field-name"),
-    set: getFormVal("field-set"),
-    cardNumber: getFormVal("field-number"),
+    cardName,
+    set: cardSet,
+    cardNumber,
     condition: getFormVal("field-condition"),
     quantity: getFormVal("field-qty"),
     graded: document.getElementById("field-graded").checked,
@@ -396,6 +624,7 @@ async function submitCardForm(e) {
     purchasePrice: getFormVal("field-purchase-price"),
     currentPrice: getFormVal("field-current-price"),
     priceChartingUrl: getFormVal("field-url"),
+    imageUrl,
     notes: getFormVal("field-notes"),
     dateAdded: getFormVal("field-date-added"),
   };
@@ -434,7 +663,6 @@ async function executeDelete() {
   const dialog = document.getElementById("confirm-dialog");
   const rowIndex = parseInt(dialog.dataset.rowIndex);
   closeConfirm();
-
   try {
     await apiPost("deleteCard", { rowIndex });
     showToast("Card deleted.");
@@ -459,7 +687,6 @@ function saveScriptUrl() {
     showToast("That doesn't look like a valid Apps Script URL.", "error");
     return;
   }
-  // Save to localStorage for persistence
   localStorage.setItem("APPS_SCRIPT_URL", url);
   CONFIG.APPS_SCRIPT_URL = url;
   document.getElementById("setup-screen").style.display = "none";
@@ -478,12 +705,29 @@ function saveScriptUrl() {
 // ============================================================
 
 function setupEventListeners() {
-  // Search
+  // Inventory filter search
   const searchInput = document.getElementById("search-input");
   if (searchInput) {
     searchInput.addEventListener("input", (e) => {
       state.searchQuery = e.target.value;
       renderTable();
+    });
+  }
+
+  // TCG card search (debounced)
+  const tcgInput = document.getElementById("tcg-search-input");
+  if (tcgInput) {
+    tcgInput.addEventListener("input", (e) => {
+      clearTimeout(state.searchDebounceTimer);
+      const val = e.target.value.trim();
+      if (!val) {
+        setSearchState("idle");
+        return;
+      }
+      setSearchState("loading");
+      state.searchDebounceTimer = setTimeout(() => {
+        searchTCGCards(val);
+      }, 500);
     });
   }
 
