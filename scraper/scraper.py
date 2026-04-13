@@ -403,11 +403,19 @@ def scrape_card(session, card):
     # Get current price as fallback
     current_price = extract_current_price(soup)
 
-    # Download image if missing
+    # Download image if missing or if the local file doesn't exist
     github_image_url = image_url
-    if not github_image_url or "pokemontcg.io" in github_image_url:
-        # Try to download from TCG API image or from pricecharting
-        dl_url = image_url
+    local_exists = False
+    if github_image_url and GITHUB_PAGES_BASE in github_image_url:
+        local_name = github_image_url.rsplit("/", 1)[-1]
+        local_exists = (IMAGES_DIR / local_name).exists()
+    needs_download = (
+        not github_image_url
+        or "pokemontcg.io" in github_image_url
+        or (GITHUB_PAGES_BASE in github_image_url and not local_exists)
+    )
+    if needs_download:
+        dl_url = image_url if image_url and "pokemontcg.io" in image_url else ""
         if not dl_url:
             img_tag = soup.select_one("#product_image img, .product-image img")
             if img_tag:

@@ -1189,6 +1189,16 @@ function setupEventListeners() {
     });
   });
 
+  // Refresh buttons
+  const refreshAllBtn = document.getElementById("refresh-all-btn");
+  if (refreshAllBtn) refreshAllBtn.addEventListener("click", () => triggerScrape());
+
+  const refreshCardBtn = document.getElementById("refresh-card-btn");
+  if (refreshCardBtn) refreshCardBtn.addEventListener("click", () => {
+    const card = state.detailCard;
+    if (card) triggerScrape(card["Card Name"]);
+  });
+
   // Card form submit
   const form = document.getElementById("card-form");
   if (form) form.addEventListener("submit", submitCardForm);
