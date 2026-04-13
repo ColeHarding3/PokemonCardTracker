@@ -732,7 +732,14 @@ function renderDetailPriceChart(data, range) {
         },
       },
       scales: {
-        x: { grid: { color: CONFIG.CHART_COLORS.gridLine }, ticks: { color: "#888", maxTicksLimit: 8 } },
+        x: { grid: { color: CONFIG.CHART_COLORS.gridLine }, ticks: { color: "#888", maxTicksLimit: 8,
+          callback: function(value) {
+            const label = this.getLabelForValue(value);
+            if (!label) return "";
+            const [yr, mo] = label.split("-");
+            return new Date(+yr, +mo - 1, 1).toLocaleDateString("en-US", { month: "short", year: "numeric" });
+          },
+        }},
         y: { grid: { color: CONFIG.CHART_COLORS.gridLine }, ticks: { color: "#888", callback: v => formatCurrency(v) } },
       },
     },
@@ -770,7 +777,14 @@ function renderDetailVolumeChart(data, range) {
       responsive: true, maintainAspectRatio: false,
       plugins: { legend: { display: false }, tooltip: { backgroundColor: "#1a1a2e" } },
       scales: {
-        x: { stacked: true, grid: { color: CONFIG.CHART_COLORS.gridLine }, ticks: { color: "#888", maxTicksLimit: 8 } },
+        x: { stacked: true, grid: { color: CONFIG.CHART_COLORS.gridLine }, ticks: { color: "#888", maxTicksLimit: 8,
+          callback: function(value) {
+            const label = this.getLabelForValue(value);
+            if (!label) return "";
+            const [yr, mo] = label.split("-");
+            return new Date(+yr, +mo - 1, 1).toLocaleDateString("en-US", { month: "short", year: "numeric" });
+          },
+        }},
         y: { stacked: true, grid: { color: CONFIG.CHART_COLORS.gridLine }, ticks: { color: "#888" } },
       },
     },
