@@ -808,6 +808,147 @@ tbody td {
   .brand-name { display: none; }
 }
 
+/* ============================================================ CARD DETAIL MODAL */
+
+.modal-box-detail {
+  max-width: 900px;
+}
+
+.detail-meta-tag {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 400;
+  margin-left: 8px;
+}
+
+.detail-top {
+  display: flex;
+  gap: 20px;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border);
+}
+
+.detail-image-col {
+  flex-shrink: 0;
+  width: 110px;
+}
+
+.detail-card-img {
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.5);
+  display: block;
+  width: 100%;
+}
+
+.detail-stats-col {
+  flex: 1;
+  min-width: 0;
+}
+
+.detail-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px 20px;
+  margin-bottom: 16px;
+}
+
+.detail-stat { }
+
+.detail-stat-label {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.detail-stat-value {
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.detail-stat-sub {
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.psa-pop-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.psa-pop-badge {
+  align-items: center;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 14px;
+  text-align: center;
+}
+
+.psa10-badge {
+  border-color: rgba(232,185,35,0.3);
+  background: rgba(232,185,35,0.06);
+}
+
+.psa-pop-label {
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.psa-pop-value {
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.psa10-badge .psa-pop-value { color: var(--accent); }
+
+/* ---- charts section ---- */
+
+.detail-charts {
+  padding: 16px 24px 4px;
+}
+
+.detail-chart-header {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.chart-legend {
+  align-items: center;
+  color: var(--text-muted);
+  display: flex;
+  font-size: 12px;
+}
+
+.legend-dot {
+  border-radius: 50%;
+  display: inline-block;
+  height: 8px;
+  margin-right: 5px;
+  width: 8px;
+}
+
+@media (max-width: 700px) {
+  .detail-top { flex-direction: column; }
+  .detail-image-col { width: 80px; }
+  .detail-stats-grid { grid-template-columns: 1fr 1fr; }
+}
+
 /* ============================================================ CONDITION TOGGLE */
 
 .condition-toggle {

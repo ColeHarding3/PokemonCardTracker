@@ -41,6 +41,22 @@ function setupSheet() {
     ps.setFrozenRows(1);
   }
 
+  // Card Price History tab
+  if (!ss.getSheetByName("Card Price History")) {
+    var cph = ss.insertSheet("Card Price History");
+    cph.appendRow(["Card Name", "Set", "Card Number", "Condition Type", "Date", "Price", "Volume"]);
+    cph.getRange(1, 1, 1, 7).setFontWeight("bold").setBackground("#1a1a2e").setFontColor("#ffffff");
+    cph.setFrozenRows(1);
+  }
+
+  // PSA Population tab
+  if (!ss.getSheetByName("PSA Population")) {
+    var psaPop = ss.insertSheet("PSA Population");
+    psaPop.appendRow(["Card Name", "Set", "Card Number", "PSA 9 Pop", "PSA 10 Pop", "Last Updated"]);
+    psaPop.getRange(1, 1, 1, 6).setFontWeight("bold").setBackground("#1a1a2e").setFontColor("#ffffff");
+    psaPop.setFrozenRows(1);
+  }
+
   // Settings tab
   if (!ss.getSheetByName("Settings")) {
     var set = ss.insertSheet("Settings");
@@ -85,6 +101,10 @@ function doGet(e) {
         return jsonResponse(getPortfolioSnapshots());
       case "getDashboard":
         return jsonResponse(getDashboard());
+      case "getCardPriceHistory":
+        return jsonResponse(getCardPriceHistoryData(e.parameter));
+      case "getAllPriceHistory":
+        return jsonResponse(getAllPriceHistoryData());
       case "setup":
         return jsonResponse(setupSheet());
       default:
@@ -163,6 +183,7 @@ function getPortfolioSnapshots() {
 function getDashboard() {
   var inventory = getInventory();
   var snapshots = getPortfolioSnapshots();
+  var psaPopMap = getPsaPopulationData();
 
   var totalValue = 0;
   var totalCards = 0;
@@ -206,7 +227,8 @@ function getDashboard() {
       dailyChangePct: dailyChangePct,
       highestValueCard: highestCard,
       inventory: inventory.data,
-      snapshots: snapshots.data
+      snapshots: snapshots.data,
+      psaPopulation: psaPopMap
     }
   };
 }
@@ -231,6 +253,10 @@ function doPost(e) {
         return jsonResponse(updatePrices(body.data));
       case "addSnapshot":
         return jsonResponse(addSnapshot(body.data));
+      case "updatePriceHistory":
+        return jsonResponse(updateCardPriceHistory(body));
+      case "updatePsaPopulation":
+        return jsonResponse(updatePsaPopulation(body));
       default:
         return jsonResponse({ status: "error", message: "Unknown action: " + action });
     }
@@ -391,4 +417,161 @@ function addSnapshot(data) {
   ]);
 
   return { status: "success", message: "Snapshot added" };
+}
+
+// ============================================================
+// CARD PRICE HISTORY — new tab (Card Price History)
+// ============================================================
+
+function updateCardPriceHistory(body) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName("Card Price History");
+  if (!sheet) return { status: "error", message: "Card Price History sheet not found. Run setup first." };
+
+  var cardName   = body.cardName   || "";
+  var set        = body.set        || "";
+  var cardNumber = body.cardNumber || "";
+  var history    = body.history    || {};  // { ungraded: [...], psa9: [...], psa10: [...] }
+
+  // Delete existing rows for this card (scan bottom-to-top to avoid index shifting)
+  var lastRow = sheet.getLastRow();
+  for (var i = lastRow; i >= 2; i--) {
+    var rowVals = sheet.getRange(i, 1, 1, 3).getValues()[0];
+    if (rowVals[0] === cardName && rowVals[1] === set) {
+      sheet.deleteRow(i);
+    }
+  }
+
+  // Write new rows
+  var conditionTypes = ["ungraded", "psa9", "psa10"];
+  var rowsToAdd = [];
+  conditionTypes.forEach(function(condType) {
+    var points = history[condType] || [];
+    points.forEach(function(pt) {
+      rowsToAdd.push([
+        cardName,
+        set,
+        cardNumber,
+        condType,
+        pt.date  || "",
+        parseFloat(pt.price)  || 0,
+        pt.volume != null ? parseInt(pt.volume) : ""
+      ]);
+    });
+  });
+
+  if (rowsToAdd.length > 0) {
+    var startRow = sheet.getLastRow() + 1;
+    sheet.getRange(startRow, 1, rowsToAdd.length, 7).setValues(rowsToAdd);
+  }
+
+  return { status: "success", message: "Price history updated: " + rowsToAdd.length + " rows" };
+}
+
+function getCardPriceHistoryData(params) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName("Card Price History");
+  if (!sheet) return { status: "success", data: { ungraded: [], psa9: [], psa10: [] } };
+
+  var data = sheet.getDataRange().getValues();
+  if (data.length <= 1) return { status: "success", data: { ungraded: [], psa9: [], psa10: [] } };
+
+  var filterName = (params && params.cardName) ? params.cardName.toLowerCase() : null;
+  var filterSet  = (params && params.set)      ? params.set.toLowerCase()      : null;
+
+  var result = { ungraded: [], psa9: [], psa10: [] };
+  for (var i = 1; i < data.length; i++) {
+    var row = data[i];
+    // columns: Card Name(0) Set(1) Card Number(2) Condition Type(3) Date(4) Price(5) Volume(6)
+    if (filterName && row[0].toString().toLowerCase() !== filterName) continue;
+    if (filterSet  && row[1].toString().toLowerCase() !== filterSet)  continue;
+    var condType = row[3].toString();
+    if (!result[condType]) continue;
+    result[condType].push({
+      date:   row[4].toString(),
+      price:  parseFloat(row[5]) || 0,
+      volume: row[6] !== "" ? parseInt(row[6]) : null
+    });
+  }
+
+  // Sort each condition by date
+  ["ungraded", "psa9", "psa10"].forEach(function(k) {
+    result[k].sort(function(a, b) { return a.date < b.date ? -1 : 1; });
+  });
+
+  return { status: "success", data: result };
+}
+
+function getAllPriceHistoryData() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName("Card Price History");
+  if (!sheet) return { status: "success", data: [] };
+
+  var data = sheet.getDataRange().getValues();
+  if (data.length <= 1) return { status: "success", data: [] };
+
+  var rows = [];
+  for (var i = 1; i < data.length; i++) {
+    var row = data[i];
+    rows.push({
+      cardName:      row[0].toString(),
+      set:           row[1].toString(),
+      cardNumber:    row[2].toString(),
+      conditionType: row[3].toString(),
+      date:          row[4].toString(),
+      price:         parseFloat(row[5]) || 0,
+      volume:        row[6] !== "" ? parseInt(row[6]) : null
+    });
+  }
+  return { status: "success", data: rows };
+}
+
+// ============================================================
+// PSA POPULATION
+// ============================================================
+
+function updatePsaPopulation(body) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName("PSA Population");
+  if (!sheet) return { status: "error", message: "PSA Population sheet not found. Run setup first." };
+
+  var cardName   = body.cardName   || "";
+  var set        = body.set        || "";
+  var cardNumber = body.cardNumber || "";
+  var psa9Pop    = body.psa9Pop  != null ? parseInt(body.psa9Pop)  : "";
+  var psa10Pop   = body.psa10Pop != null ? parseInt(body.psa10Pop) : "";
+  var timestamp  = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd");
+
+  // Find existing row for this card
+  var data = sheet.getDataRange().getValues();
+  for (var i = 1; i < data.length; i++) {
+    if (data[i][0] === cardName && data[i][1] === set) {
+      sheet.getRange(i + 1, 4, 1, 3).setValues([[psa9Pop, psa10Pop, timestamp]]);
+      return { status: "success", message: "PSA population updated" };
+    }
+  }
+
+  // New row
+  sheet.appendRow([cardName, set, cardNumber, psa9Pop, psa10Pop, timestamp]);
+  return { status: "success", message: "PSA population added" };
+}
+
+function getPsaPopulationData() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName("PSA Population");
+  if (!sheet) return {};
+
+  var data = sheet.getDataRange().getValues();
+  var map = {};
+  for (var i = 1; i < data.length; i++) {
+    var key = data[i][0] + "|||" + data[i][1];
+    map[key] = {
+      cardName:   data[i][0].toString(),
+      set:        data[i][1].toString(),
+      psa9Pop:    data[i][3] !== "" ? parseInt(data[i][3]) : null,
+      psa10Pop:   data[i][4] !== "" ? parseInt(data[i][4]) : null,
+      lastUpdated: data[i][5].toString()
+    };
+  }
+  return map;
 }

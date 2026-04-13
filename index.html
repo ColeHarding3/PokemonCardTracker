@@ -89,6 +89,8 @@
       <div class="panel">
         <div class="panel-header">
           <span class="panel-title">Portfolio Value Over Time</span>
+          <div style="display:flex;align-items:center;gap:10px">
+          <button id="chart-mode-btn" class="btn btn-ghost btn-sm" style="font-size:11px">Use Price History</button>
           <div class="range-btns">
             <button class="range-btn" data-range="1W">1W</button>
             <button class="range-btn" data-range="1M">1M</button>
@@ -96,6 +98,7 @@
             <button class="range-btn" data-range="6M">6M</button>
             <button class="range-btn" data-range="1Y">1Y</button>
             <button class="range-btn active" data-range="ALL">ALL</button>
+          </div>
           </div>
         </div>
         <div class="panel-body">
@@ -377,6 +380,107 @@
     </div><!-- /modal-form-view -->
 
   </div><!-- /modal-box -->
+</div>
+
+<!-- ============================================================ CARD DETAIL MODAL -->
+<div id="card-detail-modal" class="modal-overlay">
+  <div class="modal-box modal-box-detail">
+
+    <div class="modal-header">
+      <div>
+        <h2 id="detail-card-name">Card Detail</h2>
+        <span id="detail-card-meta" class="detail-meta-tag"></span>
+      </div>
+      <button class="modal-close" onclick="closeDetailModal()">✕</button>
+    </div>
+
+    <!-- Top strip: image + key stats -->
+    <div class="detail-top">
+      <div class="detail-image-col">
+        <img id="detail-card-img" src="" alt="" class="detail-card-img" />
+      </div>
+      <div class="detail-stats-col">
+        <div class="detail-stats-grid">
+          <div class="detail-stat">
+            <div class="detail-stat-label">Current Price</div>
+            <div class="detail-stat-value" id="detail-current-price">—</div>
+          </div>
+          <div class="detail-stat">
+            <div class="detail-stat-label">Purchase Price</div>
+            <div class="detail-stat-value" id="detail-purchase-price">—</div>
+          </div>
+          <div class="detail-stat">
+            <div class="detail-stat-label">Gain / Loss</div>
+            <div class="detail-stat-value" id="detail-gain">—</div>
+            <div class="detail-stat-sub" id="detail-gain-pct"></div>
+          </div>
+          <div class="detail-stat">
+            <div class="detail-stat-label">Total Value</div>
+            <div class="detail-stat-value" id="detail-total-value">—</div>
+          </div>
+          <div class="detail-stat">
+            <div class="detail-stat-label">Condition</div>
+            <div class="detail-stat-value" id="detail-condition">—</div>
+          </div>
+          <div class="detail-stat">
+            <div class="detail-stat-label">Purchase Date</div>
+            <div class="detail-stat-value" id="detail-purchase-date">—</div>
+          </div>
+        </div>
+        <!-- PSA Population badges -->
+        <div id="detail-psa-pop" class="psa-pop-row" style="display:none">
+          <div class="psa-pop-badge">
+            <span class="psa-pop-label">PSA 9 Pop</span>
+            <span class="psa-pop-value" id="detail-psa9-pop">—</span>
+          </div>
+          <div class="psa-pop-badge psa10-badge">
+            <span class="psa-pop-label">PSA 10 Pop</span>
+            <span class="psa-pop-value" id="detail-psa10-pop">—</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="detail-charts">
+      <div class="detail-chart-header">
+        <div class="chart-legend">
+          <span class="legend-dot" style="background:#4e9af1"></span> Ungraded
+          <span class="legend-dot" style="background:#c0c0c0;margin-left:12px"></span> PSA 9
+          <span class="legend-dot" style="background:#e8b923;margin-left:12px"></span> PSA 10
+        </div>
+        <div class="range-btns">
+          <button class="range-btn detail-range-btn" data-range="6M">6M</button>
+          <button class="range-btn detail-range-btn" data-range="1Y">1Y</button>
+          <button class="range-btn detail-range-btn" data-range="2Y">2Y</button>
+          <button class="range-btn detail-range-btn active" data-range="ALL">ALL</button>
+        </div>
+      </div>
+
+      <div id="detail-chart-loading" class="search-state" style="min-height:160px">
+        <div class="loader-spinner"></div>
+        <p class="search-hint-sub" style="margin-top:12px">Loading price history…</p>
+      </div>
+      <div id="detail-chart-empty" class="search-state" style="display:none;min-height:160px">
+        <p class="search-hint-text">No price history yet</p>
+        <p class="search-hint-sub">Run the scraper to collect historical data</p>
+      </div>
+      <div id="detail-charts-wrap" style="display:none">
+        <div class="chart-wrapper" style="height:220px">
+          <canvas id="price-history-chart"></canvas>
+        </div>
+        <div class="chart-wrapper" style="height:120px;margin-top:12px">
+          <canvas id="volume-chart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeDetailModal()">Close</button>
+      <button class="btn btn-primary" id="detail-edit-btn" onclick="closeDetailAndEdit()">Edit Card</button>
+    </div>
+
+  </div>
 </div>
 
 <!-- ============================================================ CONFIRM DIALOG -->
