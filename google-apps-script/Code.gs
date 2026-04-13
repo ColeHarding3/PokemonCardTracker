@@ -15,10 +15,10 @@ function setupSheet() {
     var inv = ss.insertSheet("Inventory");
     inv.appendRow([
       "Row", "Card Name", "Set", "Card Number", "Condition", "Quantity",
-      "Graded", "PSA Grade", "Purchase Price", "Current Price", "Total Value",
+      "Graded", "PSA Grade", "Purchase Price", "Purchase Date", "Current Price", "Total Value",
       "PriceCharting URL", "Date Added", "Notes", "Image URL"
     ]);
-    inv.getRange(1, 1, 1, 15).setFontWeight("bold").setBackground("#1a1a2e").setFontColor("#ffffff");
+    inv.getRange(1, 1, 1, 16).setFontWeight("bold").setBackground("#1a1a2e").setFontColor("#ffffff");
     inv.setFrozenRows(1);
   }
 
@@ -262,6 +262,7 @@ function addCard(data) {
     data.graded === true || data.graded === "true" ? "Yes" : "No",
     data.psaGrade || "",
     parseFloat(data.purchasePrice) || 0,
+    data.purchaseDate || "",
     parseFloat(data.currentPrice) || 0,
     totalValue,
     data.priceChartingUrl || "",
@@ -294,6 +295,7 @@ function updateCard(rowIndex, data) {
     data.graded === true || data.graded === "true" ? "Yes" : "No",
     data.psaGrade || "",
     parseFloat(data.purchasePrice) || 0,
+    data.purchaseDate || "",
     parseFloat(data.currentPrice) || 0,
     totalValue,
     data.priceChartingUrl || "",
@@ -338,9 +340,9 @@ function updatePrices(priceUpdates) {
     var newPrice = parseFloat(update.currentPrice) || 0;
     var totalValue = newPrice * qty;
 
-    // Update Current Price and Total Value columns (cols 10 and 11)
-    sheet.getRange(ri, 10).setValue(newPrice);
-    sheet.getRange(ri, 11).setValue(totalValue);
+    // Update Current Price and Total Value columns (cols 11 and 12)
+    sheet.getRange(ri, 11).setValue(newPrice);
+    sheet.getRange(ri, 12).setValue(totalValue);
 
     // Log to Price History
     if (histSheet) {

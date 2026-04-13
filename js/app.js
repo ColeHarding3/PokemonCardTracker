@@ -387,7 +387,7 @@ function renderTable() {
     : `${rows.length} of ${state.inventory.length}`;
 
   if (rows.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="8" class="empty-state">
+    tbody.innerHTML = `<tr><td colspan="9" class="empty-state">
       ${state.searchQuery ? "No cards match your search." : 'No cards yet. Click <strong>+ Add Card</strong> to get started.'}
     </td></tr>`;
     return;
@@ -424,6 +424,7 @@ function renderTable() {
         <td>${formatCurrency(cur)}</td>
         <td class="${changeClass}">${formatCurrency(change, true)}<br><small>${formatPct(changePct, true)}</small></td>
         <td><strong>${formatCurrency(total)}</strong></td>
+        <td>${escHtml(card["Purchase Date"] || "—")}</td>
         <td>
           <div class="action-btns">
             <button class="btn-icon btn-edit" onclick="openEditModal(${card._rowIndex})" title="Edit">✏️</button>
@@ -536,6 +537,8 @@ function openAddModal() {
 
   document.getElementById("modal-title").textContent = "Add Card";
   document.getElementById("card-form").reset();
+  // Default purchase date to today
+  document.getElementById("field-purchase-date").value = new Date().toISOString().slice(0, 10);
 
   // Reset search
   const input = document.getElementById("tcg-search-input");
@@ -568,6 +571,7 @@ function openEditModal(rowIndex) {
   fillFormField("field-graded", card["Graded"] === "Yes");
   fillFormField("field-psa", card["PSA Grade"]);
   fillFormField("field-purchase-price", card["Purchase Price"]);
+  fillFormField("field-purchase-date", card["Purchase Date"]);
   fillFormField("field-current-price", card["Current Price"]);
   fillFormField("field-url", card["PriceCharting URL"]);
   fillFormField("field-image-url", card["Image URL"]);
@@ -622,6 +626,7 @@ async function submitCardForm(e) {
     graded: document.getElementById("field-graded").checked,
     psaGrade: getFormVal("field-psa"),
     purchasePrice: getFormVal("field-purchase-price"),
+    purchaseDate: getFormVal("field-purchase-date"),
     currentPrice: getFormVal("field-current-price"),
     priceChartingUrl: getFormVal("field-url"),
     imageUrl,
