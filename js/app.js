@@ -489,7 +489,14 @@ function renderChart() {
         },
       },
       scales: {
-        x: { grid: { color: CONFIG.CHART_COLORS.gridLine }, ticks: { color: "#888", maxTicksLimit: 8 } },
+        x: { grid: { color: CONFIG.CHART_COLORS.gridLine }, ticks: { color: "#888", maxTicksLimit: 8,
+          callback: function(value) {
+            const label = this.getLabelForValue(value);
+            if (!label) return "";
+            const parts = label.split("-");
+            return new Date(+parts[0], +parts[1] - 1, 1).toLocaleDateString("en-US", { month: "short", year: "numeric" });
+          },
+        }},
         y: { grid: { color: CONFIG.CHART_COLORS.gridLine }, ticks: { color: "#888", callback: v => formatCurrency(v) } },
       },
     },
