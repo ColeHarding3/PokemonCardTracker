@@ -644,11 +644,16 @@ function updatePriceChartingUrls(updates) {
 
   if (!updates || !updates.length) return { status: "success", message: "No updates" };
 
+  var data = sheet.getDataRange().getValues();
   var count = 0;
   for (var i = 0; i < updates.length; i++) {
-    var rowIndex = parseInt(updates[i].rowIndex);
     var url = updates[i].url || "";
-    if (!rowIndex || rowIndex < 2 || !url) continue;
+    if (!url) continue;
+    var rowIndex = parseInt(updates[i].rowIndex);
+    if (!rowIndex || rowIndex < 2) {
+      rowIndex = findRowByNameSet_(data, updates[i].cardName, updates[i].set);
+    }
+    if (!rowIndex) continue;
     sheet.getRange(rowIndex, 13).setValue(url); // col 13 = PriceCharting URL
     count++;
   }
@@ -666,15 +671,31 @@ function updateImageUrls(updates) {
 
   if (!updates || !updates.length) return { status: "success", message: "No updates" };
 
+  var data = sheet.getDataRange().getValues();
   var count = 0;
   for (var i = 0; i < updates.length; i++) {
-    var rowIndex = parseInt(updates[i].rowIndex);
     var imageUrl = updates[i].imageUrl || "";
-    if (!rowIndex || rowIndex < 2) continue;
+    var rowIndex = parseInt(updates[i].rowIndex);
+    if (!rowIndex || rowIndex < 2) {
+      rowIndex = findRowByNameSet_(data, updates[i].cardName, updates[i].set);
+    }
+    if (!rowIndex) continue;
     sheet.getRange(rowIndex, 16).setValue(imageUrl); // col 16 = Image URL
     count++;
   }
   return { status: "success", message: "Updated " + count + " image URL(s)" };
+}
+
+function findRowByNameSet_(data, cardName, cardSet) {
+  if (!cardName) return null;
+  cardName = cardName.toString().toLowerCase().trim();
+  cardSet = (cardSet || "").toString().toLowerCase().trim();
+  for (var r = 1; r < data.length; r++) {
+    var name = (data[r][1] || "").toString().toLowerCase().trim(); // col B
+    var set  = (data[r][2] || "").toString().toLowerCase().trim(); // col C
+    if (name === cardName && set === cardSet) return r + 1; // 1-indexed sheet row
+  }
+  return null;
 }
 
 function getPsaPopulationData() {
