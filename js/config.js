@@ -16,7 +16,7 @@ const CONFIG = {
   // GitHub Personal Access Token for triggering Actions workflows.
   // Generate one at: GitHub → Settings → Developer settings → Personal access tokens
   // Requires "workflow" scope. Leave empty to disable manual refresh buttons.
-  GITHUB_TOKEN: "",
+  GITHUB_TOKEN: "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",
   GITHUB_OWNER: "Coleharding3",
   GITHUB_REPO:  "pokemoncardtracker",
 
