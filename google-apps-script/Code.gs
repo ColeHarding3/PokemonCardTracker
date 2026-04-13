@@ -317,9 +317,9 @@ function doPost(e) {
       case "updatePsaPopulation":
         return jsonResponse(updatePsaPopulation(body));
       case "updateImageUrls":
-        return jsonResponse(updateImageUrls(body.data));
+        return jsonResponse(updateImageUrls(body.cards || body.data));
       case "updatePriceChartingUrls":
-        return jsonResponse(updatePriceChartingUrls(body.data));
+        return jsonResponse(updatePriceChartingUrls(body.cards || body.data));
       case "triggerScrape":
         return jsonResponse(triggerGitHubScrape(null));
       case "triggerScrapeCard":
