@@ -313,9 +313,10 @@ def find_pricecharting_url(session, card_name, card_set=""):
         if products:
             # Pick the first (best) match
             p = products[0]
-            product_id = p.get("id", "")
-            if product_id:
-                product_url = f"{PRICECHARTING_BASE}/offers?product={product_id}"
+            console_slug = re.sub(r'[^a-z0-9]+', '-', p.get("consoleName", "").lower()).strip('-')
+            product_slug = re.sub(r'[^a-z0-9]+', '-', p.get("productName", "").lower()).strip('-')
+            if console_slug and product_slug:
+                product_url = f"{PRICECHARTING_BASE}/game/{console_slug}/{product_slug}"
                 log.info("Found URL: %s", product_url)
                 return product_url
     except Exception as e:
