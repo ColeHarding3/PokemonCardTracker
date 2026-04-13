@@ -418,7 +418,7 @@ def scrape_card(session, card):
     if needs_download:
         dl_url = image_url if image_url and "pokemontcg.io" in image_url else ""
         if not dl_url:
-            img_tag = soup.select_one("#product_image img, .product-image img")
+            img_tag = soup.select_one("img.js-show-dialog, #product_image img, .product-image img")
             if img_tag:
                 dl_url = img_tag.get("src", "")
                 if dl_url and not dl_url.startswith("http"):
