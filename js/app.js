@@ -573,7 +573,9 @@ function calculateHistoricalPortfolio(allHistory, inventory) {
   for (const month of allMonths) {
     let totalValue = 0;
     for (const card of inventory) {
-      const purchaseDate = (card["Purchase Date"] || card["Date Added"] || "").slice(0, 7);
+      const rawPD = String(card["Purchase Date"] || "").trim();
+      // Only use purchase date if it looks like a real date (YYYY-MM-DD or YYYY-MM)
+      const purchaseDate = /^\d{4}-\d{2}/.test(rawPD) ? rawPD.slice(0, 7) : "";
       if (purchaseDate && purchaseDate > month) continue;
 
       const condType = condTypeForCard(card);
@@ -1116,98 +1118,4 @@ function setupEventListeners() {
   if (form) form.addEventListener("submit", submitCardForm);
 
   // Add/edit modal close on backdrop
-  document.getElementById("card-modal").addEventListener("click", e => { if (e.target === e.currentTarget) closeModal(); });
-
-  // Detail modal close on backdrop
-  document.getElementById("card-detail-modal").addEventListener("click", e => { if (e.target === e.currentTarget) closeDetailModal(); });
-
-  // Confirm dialog
-  document.getElementById("confirm-yes").addEventListener("click", executeDelete);
-  document.getElementById("confirm-no").addEventListener("click",  closeConfirm);
-
-  // Update URL button
-  const updateUrlBtn = document.getElementById("update-url-btn");
-  if (updateUrlBtn) {
-    updateUrlBtn.addEventListener("click", () => {
-      const newUrl = prompt("Enter your new Apps Script URL:");
-      if (newUrl && newUrl.startsWith("https://")) {
-        localStorage.setItem("APPS_SCRIPT_URL", newUrl);
-        CONFIG.APPS_SCRIPT_URL = newUrl;
-        showToast("URL updated. Reloading…");
-        setTimeout(loadDashboard, 500);
-      }
-    });
-  }
-
-  // Refresh All Prices button
-  const refreshAllBtn = document.getElementById("refresh-all-btn");
-  if (refreshAllBtn) refreshAllBtn.addEventListener("click", () => triggerScrape());
-
-  // Refresh This Card button (inside detail modal)
-  const refreshCardBtn = document.getElementById("refresh-card-btn");
-  if (refreshCardBtn) {
-    refreshCardBtn.addEventListener("click", () => {
-      const cardName = state.detailCard && state.detailCard["Card Name"];
-      if (cardName) triggerScrape(cardName);
-    });
-  }
-}
-
-// ============================================================
-// UTILITIES
-// ============================================================
-
-function formatCurrency(val, signed = false) {
-  const n = parseFloat(val) || 0;
-  const prefix = signed && n > 0 ? "+" : "";
-  return prefix + new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2 }).format(n);
-}
-
-function formatPct(val, signed = false) {
-  const n = parseFloat(val) || 0;
-  return (signed && n > 0 ? "+" : "") + n.toFixed(2) + "%";
-}
-
-function escHtml(str) {
-  return String(str).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
-}
-
-function setText(id, value) {
-  const el = document.getElementById(id);
-  if (el) el.textContent = value;
-}
-
-function getFormVal(id) {
-  const el = document.getElementById(id);
-  return el ? el.value : "";
-}
-
-function fillFormField(id, value) {
-  const el = document.getElementById(id);
-  if (!el) return;
-  if (el.type === "checkbox") el.checked = !!value;
-  else el.value = value || "";
-}
-
-function showGlobalLoader(show) {
-  const el = document.getElementById("global-loader");
-  if (el) el.style.display = show ? "flex" : "none";
-}
-
-function showError(msg)  { showToast(msg, "error"); }
-
-function showToast(msg, type = "success") {
-  const container = document.getElementById("toast-container");
-  if (!container) return;
-  const toast = document.createElement("div");
-  toast.className = "toast toast-" + type;
-  toast.textContent = msg;
-  container.appendChild(toast);
-  setTimeout(() => toast.classList.add("visible"), 10);
-  setTimeout(() => { toast.classList.remove("visible"); setTimeout(() => toast.remove(), 300); }, 3500);
-}
-
-function updateLastUpdated() {
-  const el = document.getElementById("last-updated");
-  if (el) el.textContent = "Updated " + new Date().toLocaleTimeString();
-}
+  docu
