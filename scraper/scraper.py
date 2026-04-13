@@ -376,7 +376,7 @@ def download_images(inventory, session):
     newly_saved = []
 
     for card in inventory:
-        image_url = (card.get("Image URL") or "").strip()
+        image_url = str(card.get("Image URL") or "").strip()
         if not image_url or "pokemontcg.io" not in image_url:
             continue
 
@@ -525,10 +525,10 @@ def scrape_all():
     highest_price    = 0.0
 
     for idx, card in enumerate(inventory):
-        name        = card.get("Card Name", "Unknown")
-        set_name    = card.get("Set", "")
-        card_number = card.get("Card Number", "")
-        url         = (card.get("PriceCharting URL") or "").strip()
+        name        = str(card.get("Card Name") or "Unknown")
+        set_name    = str(card.get("Set") or "")
+        card_number = str(card.get("Card Number") or "")
+        url         = str(card.get("PriceCharting URL") or "").strip()
         row_index   = card.get("_rowIndex")
         qty         = float(card.get("Quantity") or 1)
 
