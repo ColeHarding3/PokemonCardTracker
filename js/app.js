@@ -255,6 +255,7 @@ async function loadAllPriceHistory() {
   if (state.allPriceHistory) return state.allPriceHistory;
   try {
     const result = await apiFetch("getAllPriceHistory");
+    console.log("[priceHistory] raw API result:", result);
     if (result.status === "success") {
       state.allPriceHistory = result.data || [];
       return state.allPriceHistory;
@@ -535,16 +536,22 @@ function calculateHistoricalPortfolio(allHistory, inventory) {
   console.log("[calc] allHistory length:", allHistory.length, "inventory length:", inventory.length);
   if (!allHistory.length || !inventory.length) return [];
 
-  // Build map: "cardName|||set|||condType" -> { "YYYY-MM": price }
-  const priceMap = {};
+  function norm(s) { return String(s || "").trim().toLowerCase(); }
+
+  // Primary map:  "name|||set|||condType"  (all lowercased/trimmed)
+  // Fallback map: "name|||condType"        (ignore set — handles set name mismatches)
+  const priceMap     = {};
+  const priceMapName = {};
   for (const row of allHistory) {
-    const key = `${row.cardName}|||${row.set}|||${row.conditionType}`;
-    if (!priceMap[key]) priceMap[key] = {};
-    priceMap[key][row.date] = row.price;
+    const fullKey = `${norm(row.cardName)}|||${norm(row.set)}|||${norm(row.conditionType)}`;
+    const nameKey = `${norm(row.cardName)}|||${norm(row.conditionType)}`;
+    if (!priceMap[fullKey])     priceMap[fullKey]     = {};
+    if (!priceMapName[nameKey]) priceMapName[nameKey] = {};
+    priceMap[fullKey][row.date]     = row.price;
+    priceMapName[nameKey][row.date] = row.price;
   }
   console.log("[calc] priceMap keys:", Object.keys(priceMap));
 
-  // Determine condition type per card
   function condTypeForCard(card) {
     const cond = String(card["Condition"] || "").toUpperCase();
     if (cond.startsWith("PSA 10")) return "psa10";
@@ -552,7 +559,6 @@ function calculateHistoricalPortfolio(allHistory, inventory) {
     return "ungraded";
   }
 
-  // Find closest price at or before target month
   function priceAtMonth(monthMap, targetMonth) {
     if (!monthMap) return null;
     if (monthMap[targetMonth]) return monthMap[targetMonth];
@@ -560,7 +566,6 @@ function calculateHistoricalPortfolio(allHistory, inventory) {
     return months.length ? monthMap[months[months.length - 1]] : null;
   }
 
-  // Collect all months across the history data
   const allMonths = [...new Set(allHistory.map(r => r.date))].sort();
   if (!allMonths.length) return [];
 
@@ -569,15 +574,39 @@ function calculateHistoricalPortfolio(allHistory, inventory) {
     let totalValue = 0;
     for (const card of inventory) {
       const purchaseDate = (card["Purchase Date"] || card["Date Added"] || "").slice(0, 7);
-      if (purchaseDate && purchaseDate > month) continue; // card not yet owned
+      if (purchaseDate && purchaseDate > month) continue;
+
       const condType = condTypeForCard(card);
-      const key = `${card["Card Name"]}|||${card["Set"]}|||${condType}`;
-      const qty = parseFloat(card["Quantity"]) || 1;
-      const price = priceAtMonth(priceMap[key], month)
-        ?? parseFloat(card["Current Price"]) ?? 0;
-      console.log("[calc]", month, "|", card["Card Name"], "| condType:", condType, "| inPriceMap:", !!priceMap[key], "| price:", price, "| qty:", qty);
+      const fullKey  = `${norm(card["Card Name"])}|||${norm(card["Set"])}|||${condType}`;
+      const nameKey  = `${norm(card["Card Name"])}|||${condType}`;
+      const qty      = parseFloat(card["Quantity"]) || 1;
+
+      // Try full key, then name-only fallback, then current price
+      let price = priceAtMonth(priceMap[fullKey], month)
+               ?? priceAtMonth(priceMapName[nameKey], month)
+               ?? parseFloat(card["Current Price"]) || 0;
+
+      console.log("[calc]", month, "|", card["Card Name"], "| fullKey:", fullKey,
+        "| fullMatch:", !!priceMap[fullKey], "| nameMatch:", !!priceMapName[nameKey],
+        "| price:", price, "| qty:", qty);
+
       totalValue += price * qty;
     }
+
+    // Safety net: if totalValue is 0 but cards exist, sum current prices
+    if (totalValue === 0) {
+      const ownedCards = inventory.filter(c => {
+        const pd = (c["Purchase Date"] || c["Date Added"] || "").slice(0, 7);
+        return !pd || pd <= month;
+      });
+      if (ownedCards.length > 0) {
+        totalValue = ownedCards.reduce((sum, c) => {
+          return sum + (parseFloat(c["Current Price"]) || 0) * (parseFloat(c["Quantity"]) || 1);
+        }, 0);
+        if (totalValue > 0) console.log("[calc]", month, "| used current-price fallback, total:", totalValue);
+      }
+    }
+
     results.push({ date: month, value: totalValue });
   }
   return results;
