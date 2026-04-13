@@ -134,34 +134,62 @@ function doGet(e) {
   }
 }
 
+/**
+ * Ensure the Inventory sheet has every expected column.
+ * Missing columns are inserted at the correct position so that existing
+ * data stays aligned.  Runs once per deploy (uses a Script Property flag).
+ */
+function migrateInventoryColumns_() {
+  var EXPECTED = [
+    "Row", "Card Name", "Set", "Card Number", "Condition", "Quantity",
+    "Graded", "PSA Grade", "Purchase Price", "Purchase Date", "Current Price",
+    "Total Value", "PriceCharting URL", "Date Added", "Notes", "Image URL"
+  ];
+
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Inventory");
+  if (!sheet) return;
+
+  var lastCol = sheet.getLastColumn();
+  var headers = lastCol > 0 ? sheet.getRange(1, 1, 1, lastCol).getValues()[0] : [];
+
+  var inserted = 0;
+  for (var i = 0; i < EXPECTED.length; i++) {
+    var pos = i + 1; // 1-indexed target column
+    var cur = (pos <= headers.length) ? (headers[pos - 1] || "").toString().trim() : "";
+    if (cur !== EXPECTED[i]) {
+      // Column is missing — insert it
+      sheet.insertColumnBefore(pos);
+      sheet.getRange(1, pos).setValue(EXPECTED[i]);
+      // Refresh local copy
+      headers.splice(i, 0, EXPECTED[i]);
+      inserted++;
+    }
+  }
+  if (inserted > 0) {
+    sheet.getRange(1, 1, 1, EXPECTED.length)
+      .setFontWeight("bold").setBackground("#1a1a2e").setFontColor("#ffffff");
+  }
+}
+
 function getInventory() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName("Inventory");
   if (!sheet) return { status: "error", message: "Inventory sheet not found. Run setup first." };
 
+  // Ensure all expected columns exist
+  migrateInventoryColumns_();
+
   var data = sheet.getDataRange().getValues();
   if (data.length <= 1) return { status: "success", data: [] };
 
-  var headers = data[0].slice(); // copy so we can patch without mutating sheet data
-  // Migration safety: if the sheet predates the Image URL column, col 16 header is
-  // an empty string but the data rows may still have a URL there (written by addCard).
-  // Map it correctly so card["Image URL"] is never undefined on the frontend.
-  var EXPECTED_HEADERS = [
-    "Row", "Card Name", "Set", "Card Number", "Condition", "Quantity",
-    "Graded", "PSA Grade", "Purchase Price", "Purchase Date", "Current Price",
-    "Total Value", "PriceCharting URL", "Date Added", "Notes", "Image URL"
-  ];
-  for (var k = 0; k < EXPECTED_HEADERS.length; k++) {
-    if (!headers[k]) headers[k] = EXPECTED_HEADERS[k];
-  }
-
+  var headers = data[0].slice();
   var rows = [];
   for (var i = 1; i < data.length; i++) {
     var row = {};
     for (var j = 0; j < headers.length; j++) {
       row[headers[j]] = data[i][j];
     }
-    row["_rowIndex"] = i + 1; // 1-based sheet row number
+    row["_rowIndex"] = i + 1;
     rows.push(row);
   }
   return { status: "success", data: rows };
