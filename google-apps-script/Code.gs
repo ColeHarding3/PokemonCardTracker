@@ -105,6 +105,10 @@ function doGet(e) {
         return jsonResponse(getCardPriceHistoryData(e.parameter));
       case "getAllPriceHistory":
         return jsonResponse(getAllPriceHistoryData());
+      case "triggerScrape":
+        return jsonResponse(triggerGitHubScrape(null));
+      case "triggerScrapeCard":
+        return jsonResponse(triggerGitHubScrape(e.parameter.cardName || null));
       case "setup":
         return jsonResponse(setupSheet());
       default:

@@ -958,9 +958,12 @@ async function triggerScrape(cardName = null) {
   showToast(`Triggering price refresh for ${label}…`);
 
   const action = cardName ? "triggerScrapeCard" : "triggerScrape";
+  const params = cardName ? { cardName } : {};
 
   try {
-    const res = await apiPost(action, cardName ? { cardName } : {});
+    // Use apiFetch (GET) so we can read the Apps Script response — apiPost
+    // uses no-cors and can never read the reply, masking any errors.
+    const res = await apiFetch(action, params);
     if (res && res.status === "success") {
       showToast(`Refresh started for ${label}. Check GitHub Actions for progress.`);
     } else {
