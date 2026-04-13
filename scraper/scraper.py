@@ -397,19 +397,55 @@ def download_images(inventory, session):
     return updates
 
 
-def search_for_url(card_name, set_name, session):
-    """Search PriceCharting for a card and return its product URL."""
+def _slugify(text):
+    """'Pokemon Evolving Skies' -> 'pokemon-evolving-skies'"""
+    slug = text.lower()
+    slug = re.sub(r"[^a-z0-9]+", "-", slug)
+    return slug.strip("-")
+
+
+def search_for_url(card_name, set_name, session, card_number=""):
+    """
+    Search PriceCharting for a card using their JSON search API and return
+    the product page URL.  The HTML search page no longer contains results
+    in the server-rendered markup — results are JS-rendered — so we use:
+      /search-products?q=...&type=pokemon&format=json
+    which returns a JSON list of products without requiring an API token.
+    """
     query = f"{card_name} {set_name}".strip()
-    url = f"{PRICECHARTING_BASE}/search-products?q={quote_plus(query)}&type=pokemon"
+    api_url = (
+        f"{PRICECHARTING_BASE}/search-products"
+        f"?q={quote_plus(query)}&type=pokemon&format=json"
+    )
     try:
-        resp = session.get(url, headers=HEADERS, timeout=REQUEST_TIMEOUT)
+        resp = session.get(api_url, headers=HEADERS, timeout=REQUEST_TIMEOUT)
         resp.raise_for_status()
-        soup = BeautifulSoup(resp.text, "html.parser")
-        link = soup.select_one("table.results td.title a")
-        if link:
-            found = urljoin(PRICECHARTING_BASE, link["href"])
-            log.info("  Found via search: %s", found)
-            return found
+        products = resp.json().get("products", [])
+        if not products:
+            log.warning("  Search returned no products.")
+            return None
+
+        # If we have a card number, prefer the result whose productName contains it
+        chosen = products[0]
+        if card_number:
+            card_number_str = str(card_number).lstrip("0")
+            for p in products:
+                pname = p.get("productName", "")
+                # Match "#215" or "215" at the end of the product name
+                if re.search(r"#0*" + re.escape(card_number_str) + r"(\b|$)", pname):
+                    chosen = p
+                    break
+
+        console_slug = _slugify(chosen.get("consoleName", ""))
+        product_slug = _slugify(chosen.get("productName", ""))
+        if not console_slug or not product_slug:
+            log.warning("  Could not build slug from product data: %s", chosen)
+            return None
+
+        found = f"{PRICECHARTING_BASE}/game/{console_slug}/{product_slug}"
+        log.info("  Found via search: %s  (%s)", found, chosen.get("productName"))
+        return found
+
     except Exception as e:
         log.error("  Search error: %s", e)
     return None
@@ -488,7 +524,7 @@ def scrape_all():
         # Auto-discover URL via search if missing
         if not url:
             time.sleep(REQUEST_DELAY)
-            url = search_for_url(name, set_name, session)
+            url = search_for_url(name, set_name, session, card_number=card_number)
             if not url:
                 log.warning("  No URL found — skipping.\n")
                 total_value  += float(card.get("Current Price") or 0) * qty
