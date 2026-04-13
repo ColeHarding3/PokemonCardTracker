@@ -263,6 +263,8 @@ function doPost(e) {
         return jsonResponse(updatePsaPopulation(body));
       case "updateImageUrls":
         return jsonResponse(updateImageUrls(body.data));
+      case "updatePriceChartingUrls":
+        return jsonResponse(updatePriceChartingUrls(body.data));
       case "triggerScrape":
         return jsonResponse(triggerGitHubScrape(null));
       case "triggerScrapeCard":
@@ -604,6 +606,28 @@ function triggerGitHubScrape(cardName) {
     try { body = JSON.parse(response.getContentText()).message; } catch (e) {}
     return { status: "error", message: "GitHub API error " + code + (body ? ": " + body : "") };
   }
+}
+
+// ============================================================
+// PRICECHARTING URL UPDATE
+// ============================================================
+
+function updatePriceChartingUrls(updates) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName("Inventory");
+  if (!sheet) return { status: "error", message: "Inventory sheet not found." };
+
+  if (!updates || !updates.length) return { status: "success", message: "No updates" };
+
+  var count = 0;
+  for (var i = 0; i < updates.length; i++) {
+    var rowIndex = parseInt(updates[i].rowIndex);
+    var url = updates[i].url || "";
+    if (!rowIndex || rowIndex < 2 || !url) continue;
+    sheet.getRange(rowIndex, 13).setValue(url); // col 13 = PriceCharting URL
+    count++;
+  }
+  return { status: "success", message: "Updated " + count + " PriceCharting URL(s)" };
 }
 
 // ============================================================

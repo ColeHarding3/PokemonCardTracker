@@ -468,11 +468,12 @@ def scrape_all():
 
     log.info("")
 
-    price_updates = []
-    total_value   = 0.0
-    total_cards   = 0
-    highest_card  = None
-    highest_price = 0.0
+    price_updates    = []
+    url_updates      = []   # newly discovered PriceCharting URLs to save back
+    total_value      = 0.0
+    total_cards      = 0
+    highest_card     = None
+    highest_price    = 0.0
 
     for idx, card in enumerate(inventory):
         name        = card.get("Card Name", "Unknown")
@@ -484,7 +485,7 @@ def scrape_all():
 
         log.info("[%d/%d] %s — %s", idx + 1, len(inventory), name, set_name)
 
-        # Find URL if missing
+        # Auto-discover URL via search if missing
         if not url:
             time.sleep(REQUEST_DELAY)
             url = search_for_url(name, set_name, session)
@@ -493,6 +494,9 @@ def scrape_all():
                 total_value  += float(card.get("Current Price") or 0) * qty
                 total_cards  += int(qty)
                 continue
+            # Queue the discovered URL so it's saved back to the sheet
+            url_updates.append({"rowIndex": row_index, "url": url})
+            log.info("  URL queued for save: %s", url)
 
         # Scrape
         time.sleep(REQUEST_DELAY)
@@ -546,6 +550,15 @@ def scrape_all():
                 log.error("  psa pop POST failed: %s", e)
 
         log.info("")
+
+    # Save newly discovered PriceCharting URLs back to the sheet
+    if url_updates:
+        log.info("Saving %d discovered PriceCharting URL(s)…", len(url_updates))
+        try:
+            res = api_post(session, "updatePriceChartingUrls", {"data": url_updates})
+            log.info("  %s", res.get("message", "ok"))
+        except Exception as e:
+            log.error("  URL save failed: %s", e)
 
     # Bulk update current prices
     if price_updates:
