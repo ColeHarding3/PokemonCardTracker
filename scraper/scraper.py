@@ -362,6 +362,7 @@ def scrape_card(session, card):
     card_num   = str(card.get("Card Number", "")).strip()
     pc_url     = str(card.get("PriceCharting URL", "")).strip()
     image_url  = str(card.get("Image URL", "")).strip()
+    row_index  = card.get("_rowIndex")
 
     if not name:
         log.warning("Skipping card with no name")
@@ -429,6 +430,7 @@ def scrape_card(session, card):
         "cardName": name,
         "set": card_set,
         "cardNumber": card_num,
+        "rowIndex": row_index,
         "priceHistory": price_history,
         "psaPop": psa_pop,
         "currentPrice": current_price,
@@ -481,13 +483,19 @@ def upload_results(session, result):
         except Exception as e:
             log.error("Failed to upload PSA pop for %s: %s", name, e)
 
-    # Update PriceCharting URL and image URL in Inventory
+    # Update Inventory row: PriceCharting URL, image URL, and current price
+    row_index = result.get("rowIndex")
+    if not row_index:
+        log.warning("No rowIndex for %s — skipping Inventory updates", name)
+        return
+
     if result["pcUrl"]:
         try:
             api_post(session, "updatePriceChartingUrls", {
                 "action": "updatePriceChartingUrls",
-                "cards": [{"cardName": name, "set": card_set, "url": result["pcUrl"]}],
+                "data": [{"rowIndex": row_index, "url": result["pcUrl"]}],
             })
+            log.info("Updated PriceCharting URL for %s", name)
         except Exception as e:
             log.warning("Failed to update PriceCharting URL: %s", e)
 
@@ -495,20 +503,19 @@ def upload_results(session, result):
         try:
             api_post(session, "updateImageUrls", {
                 "action": "updateImageUrls",
-                "cards": [{"cardName": name, "set": card_set, "imageUrl": result["imageUrl"]}],
+                "data": [{"rowIndex": row_index, "imageUrl": result["imageUrl"]}],
             })
+            log.info("Updated Image URL for %s", name)
         except Exception as e:
             log.warning("Failed to update Image URL: %s", e)
 
-    # Update current price
     if result["currentPrice"] is not None:
         try:
-            api_post(session, "updateCurrentPrice", {
-                "action": "updateCurrentPrice",
-                "cardName": name,
-                "set": card_set,
-                "price": result["currentPrice"],
+            api_post(session, "updatePrices", {
+                "action": "updatePrices",
+                "data": [{"rowIndex": row_index, "currentPrice": result["currentPrice"]}],
             })
+            log.info("Updated current price for %s: $%.2f", name, result["currentPrice"])
         except Exception as e:
             log.warning("Failed to update current price: %s", e)
 
