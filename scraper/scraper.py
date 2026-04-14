@@ -300,27 +300,56 @@ def extract_current_price(soup):
 # PRICECHARTING URL FINDER
 # ============================================================
 
-def find_pricecharting_url(session, card_name, card_set=""):
-    """Search pricecharting.com for a card and return the product URL."""
-    query = f"{card_name} {card_set}".strip()
+def _pick_best_product(products, card_name):
+    """Pick the product whose name best matches card_name."""
+    name_lower = card_name.lower()
+    for p in products:
+        pname = p.get("productName", "").lower()
+        # Check that the card name appears in the product name
+        if name_lower.split()[0] in pname:
+            return p
+    return products[0] if products else None
+
+def _product_to_url(product):
+    """Build a PriceCharting product page URL from a search result."""
+    console_slug = re.sub(r'[^a-z0-9]+', '-', product.get("consoleName", "").lower()).strip('-')
+    product_slug = re.sub(r'[^a-z0-9]+', '-', product.get("productName", "").lower()).strip('-')
+    if console_slug and product_slug:
+        return f"{PRICECHARTING_BASE}/game/{console_slug}/{product_slug}"
+    return None
+
+def _search_pricecharting(session, query):
+    """Run a PriceCharting JSON search and return the products list."""
     search_url = f"{PRICECHARTING_BASE}/search-products?q={quote_plus(query)}&type=pokemon&format=json"
     log.info("Searching PriceCharting: %s", search_url)
-    try:
-        resp = session.get(search_url, headers=HEADERS, timeout=REQUEST_TIMEOUT)
-        resp.raise_for_status()
-        data = resp.json()
-        products = data if isinstance(data, list) else data.get("products", [])
-        if products:
-            # Pick the first (best) match
-            p = products[0]
-            console_slug = re.sub(r'[^a-z0-9]+', '-', p.get("consoleName", "").lower()).strip('-')
-            product_slug = re.sub(r'[^a-z0-9]+', '-', p.get("productName", "").lower()).strip('-')
-            if console_slug and product_slug:
-                product_url = f"{PRICECHARTING_BASE}/game/{console_slug}/{product_slug}"
-                log.info("Found URL: %s", product_url)
-                return product_url
-    except Exception as e:
-        log.warning("PriceCharting search failed: %s", e)
+    resp = session.get(search_url, headers=HEADERS, timeout=REQUEST_TIMEOUT)
+    resp.raise_for_status()
+    data = resp.json()
+    return data if isinstance(data, list) else data.get("products", [])
+
+def find_pricecharting_url(session, card_name, card_set=""):
+    """Search pricecharting.com for a card and return the product URL.
+
+    Tries progressively simpler queries if the full query misses.
+    """
+    queries = [f"{card_name} {card_set}".strip()]
+    # Fallback: drop sub-set names like "Galarian Gallery" — keep first two words of set
+    if card_set and len(card_set.split()) > 2:
+        queries.append(f"{card_name} {' '.join(card_set.split()[:2])}")
+    # Fallback: just the card name
+    queries.append(card_name)
+
+    for query in queries:
+        try:
+            products = _search_pricecharting(session, query)
+            match = _pick_best_product(products, card_name)
+            if match:
+                url = _product_to_url(match)
+                if url:
+                    log.info("Found URL: %s", url)
+                    return url
+        except Exception as e:
+            log.warning("PriceCharting search failed for '%s': %s", query, e)
     return None
 
 # ============================================================
