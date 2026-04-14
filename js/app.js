@@ -16,6 +16,13 @@ function formatCurrency(n, signed = false) {
   return n < 0 ? "-" + formatted : formatted;
 }
 
+function formatDate(val) {
+  if (!val) return "—";
+  const d = new Date(val);
+  if (isNaN(d)) return String(val);
+  return (d.getMonth() + 1) + "/" + d.getDate() + "/" + d.getFullYear();
+}
+
 function formatPct(n, signed = false) {
   if (n == null || isNaN(n)) return "0.0%";
   const abs = Math.abs(n).toFixed(1);
@@ -490,7 +497,7 @@ function renderTable() {
       <td>${formatCurrency(cur)}</td>
       <td class="${changeClass}">${formatCurrency(change, true)}<br><small>${formatPct(changePct, true)}</small></td>
       <td><strong>${formatCurrency(total)}</strong></td>
-      <td>${escHtml(card["Purchase Date"] || "—")}</td>
+      <td>${formatDate(card["Purchase Date"])}</td>
       <td>
         <div class="action-btns">
           <button class="btn-icon btn-edit" onclick="event.stopPropagation();openEditModal(${card._rowIndex})" title="Edit">✏️</button>
@@ -723,7 +730,7 @@ function openCardDetail(rowIndex) {
   setText("detail-purchase-price", formatCurrency(buy));
   setText("detail-total-value",    formatCurrency(cur * qty));
   setText("detail-condition",      card["Condition"] || "—");
-  setText("detail-purchase-date",  card["Purchase Date"] || "—");
+  setText("detail-purchase-date",  formatDate(card["Purchase Date"]));
 
   const gainEl = document.getElementById("detail-gain");
   if (gainEl) {
