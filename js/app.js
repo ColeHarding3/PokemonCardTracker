@@ -652,8 +652,17 @@ function calculateHistoricalPortfolio(allHistory, inventory) {
   const allMonths = [...new Set(allHistory.map(r => r.date))].sort();
   if (!allMonths.length) return [];
 
+  // Start chart from the earliest purchase date, not from the earliest price history
+  const purchaseDates = inventory
+    .map(c => String(c["Purchase Date"] || "").trim())
+    .filter(d => /^\d{4}-\d{2}/.test(d))
+    .map(d => d.slice(0, 7))
+    .sort();
+  const earliestPurchase = purchaseDates.length ? purchaseDates[0] : allMonths[0];
+
   const results = [];
   for (const month of allMonths) {
+    if (month < earliestPurchase) continue;
     let totalValue = 0;
     for (const card of inventory) {
       const rawPD = String(card["Purchase Date"] || "").trim();
