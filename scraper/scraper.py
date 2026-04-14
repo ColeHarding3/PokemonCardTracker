@@ -448,24 +448,26 @@ def upload_results(session, result):
     card_set = result["set"]
     card_num = result["cardNumber"]
 
-    # Upload price history
+    # Upload price history (all conditions in one call)
+    history = {}
+    total_points = 0
     for cond_key in ("ungraded", "psa9", "psa10"):
         points = result["priceHistory"].get(cond_key, [])
-        if not points:
-            continue
-        payload = {
-            "action": "updateCardPriceHistory",
-            "cardName": name,
-            "set": card_set,
-            "cardNumber": card_num,
-            "conditionType": cond_key,
-            "priceData": points,
-        }
+        if points:
+            history[cond_key] = points
+            total_points += len(points)
+    if history:
         try:
-            api_post(session, "updateCardPriceHistory", payload)
-            log.info("Uploaded %d %s price points for %s", len(points), cond_key, name)
+            api_post(session, "updateCardPriceHistory", {
+                "action": "updateCardPriceHistory",
+                "cardName": name,
+                "set": card_set,
+                "cardNumber": card_num,
+                "history": history,
+            })
+            log.info("Uploaded %d price points for %s", total_points, name)
         except Exception as e:
-            log.error("Failed to upload %s prices for %s: %s", cond_key, name, e)
+            log.error("Failed to upload prices for %s: %s", name, e)
 
     # Upload PSA population
     if result["psaPop"]["psa9"] is not None or result["psaPop"]["psa10"] is not None:
