@@ -458,8 +458,8 @@ def upload_results(session, result):
             total_points += len(points)
     if history:
         try:
-            api_post(session, "updateCardPriceHistory", {
-                "action": "updateCardPriceHistory",
+            api_post(session, "updatePriceHistory", {
+                "action": "updatePriceHistory",
                 "cardName": name,
                 "set": card_set,
                 "cardNumber": card_num,
